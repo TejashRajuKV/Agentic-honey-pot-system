@@ -1,0 +1,303 @@
+// src/controllers/messageController.js
+const { detectScamIntent } = require("../../detection/scamDetector");
+const { generateAgentResponse } = require("../../agent/agentService");
+const { shouldWrapUp } = require("../../agent/agentStateMachine");
+const { extractIntelligence } = require("../../detection/intelligenceExtractor");
+const {
+    getOrCreateSession,
+    updateSession,
+    getConversationHistory,
+    saveConversationTurn,
+    determineEngagementPhase,
+    getSessionIntelligence
+} = require("../services/sessionService");
+const { sendFinalCallback, formatIntelligenceReport } = require("../../agent/callbackService");
+const { sanitizeText, calculateDuration } = require("../utils/helpers");
+
+// New advanced features
+const { checkKnownScammer, updateScammerIntelligence } = require("../services/crossSessionIntelligence");
+const { selectPersona, applyPersona } = require("../../agent/personaSystem");
+const auditService = require("../services/auditService");
+
+/**
+ * Handle incoming message from external platform
+ * Main entry point for the honeypot system
+ */
+exports.handleIncomingMessage = async (req, res) => {
+    try {
+        const { sessionId, message, platform, sender } = req.body;
+
+        // Validate required fields
+        if (!sessionId || !message) {
+            return res.status(400).json({
+                error: "Missing required fields",
+                required: ["sessionId", "message"]
+            });
+        }
+
+        // Sanitize input
+        const sanitizedMessage = sanitizeText(message);
+
+        // Get or create session
+        const session = await getOrCreateSession(sessionId, platform, sender);
+
+        // FEATURE 1: Assign persona on first interaction
+        if (!session.persona) {
+            const persona = selectPersona();
+            session.persona = persona;
+            await updateSession(sessionId, { persona });
+            console.log(`🎭 Persona assigned: ${persona.name}`);
+        }
+
+        // Log session start (first message)
+        if (!session.lastActiveAt || (Date.now() - session.lastActiveAt > 3600000)) {
+            await auditService.logSessionStart(sessionId, platform, sender);
+        }
+
+        // Get conversation history
+        const history = await getConversationHistory(sessionId);
+
+        // Detect scam intent with conversation context
+        const scamDetection = await detectScamIntent(sanitizedMessage, history);
+
+        // Extract intelligence from the message
+        const intelligence = extractIntelligence(sanitizedMessage);
+
+        // FEATURE 2: Cross-session intelligence check
+        let knownScammerInfo = { isKnown: false };
+        if (intelligence.upiIds.length > 0 || intelligence.phoneNumbers.length > 0) {
+            knownScammerInfo = await checkKnownScammer(intelligence.upiIds, intelligence.phoneNumbers);
+
+            if (knownScammerInfo.isKnown) {
+                console.log(`🚨 REPEAT SCAMMER DETECTED! Sessions: ${knownScammerInfo.sessionCount}`);
+
+                // Log repeat scammer detection
+                await auditService.logRepeatScammer(sessionId, knownScammerInfo);
+
+                // Boost confidence if known scammer
+                scamDetection.confidence = Math.min(scamDetection.confidence + 0.2, 1.0);
+                scamDetection.riskLevel = knownScammerInfo.riskLevel;
+            }
+        }
+
+        // FEATURE 3: Log incoming message with full context
+        await auditService.logMessageReceived(
+            sessionId,
+            sanitizedMessage,
+            scamDetection,
+            intelligence,
+            knownScammerInfo
+        );
+
+        // Save user's message turn
+        await saveConversationTurn(
+            sessionId,
+            "user",
+            sanitizedMessage,
+            intelligence,
+            scamDetection.isScam
+        );
+
+        // Update session with scam status if detected
+        if (scamDetection.isScam && session.isScam === null) {
+            await updateSession(sessionId, { isScam: true });
+            await auditService.logScamDetected(sessionId, scamDetection, intelligence);
+        }
+
+        // Determine if we should engage the AI agent
+        let agentReply = null;
+        let baitMetadata = null;
+        let shouldEngage = scamDetection.isScam || session.isScam === true;
+
+        if (shouldEngage) {
+            // Generate AI agent response with bait strategy
+            const phase = await determineEngagementPhase(sessionId);
+            const agentResult = await generateAgentResponse(
+                sanitizedMessage,
+                history,
+                scamDetection,
+                {
+                    lastBaitType: session.lastBaitType,
+                    baitUsedCount: session.baitUsedCount || 0
+                }
+            );
+
+            // Extract response and metadata
+            agentReply = agentResult.response || agentResult;
+            baitMetadata = agentResult.metadata || null;
+
+            // FEATURE 4: Apply persona to response
+            if (session.persona) {
+                agentReply = applyPersona(agentReply, session.persona, phase);
+            }
+
+            // Save agent's response turn
+            await saveConversationTurn(sessionId, "agent", agentReply);
+
+            // Log agent response with state
+            await auditService.logAgentResponse(
+                sessionId,
+                agentReply,
+                {
+                    phase,
+                    persona: session.persona?.type,
+                    baitType: baitMetadata?.baitType,
+                    turnCount: history.length + 2
+                },
+                baitMetadata?.usedBait || false
+            );
+
+            // Log bait if used
+            if (baitMetadata?.usedBait) {
+                await auditService.logBaitDeployed(sessionId, baitMetadata.baitType, phase);
+            }
+
+            // Update session with bait tracking
+            const sessionUpdates = { engagementPhase: phase };
+
+            if (baitMetadata && baitMetadata.usedBait) {
+                sessionUpdates.lastBaitType = baitMetadata.baitType;
+                sessionUpdates.baitUsedCount = (session.baitUsedCount || 0) + 1;
+
+                // Track evasion and reveals
+                if (baitMetadata.baitAnalysis) {
+                    const prevEvasion = session.evasionScore || 0;
+                    sessionUpdates.evasionScore = Math.min(
+                        prevEvasion + baitMetadata.baitAnalysis.evasionScore,
+                        1.0
+                    );
+
+                    if (baitMetadata.baitAnalysis.triggeredReveal) {
+                        sessionUpdates.triggeredReveal = true;
+                    }
+                }
+            }
+
+            await updateSession(sessionId, sessionUpdates);
+
+            // FEATURE 5: Update cross-session intelligence
+            if (intelligence.upiIds.length > 0 || intelligence.phoneNumbers.length > 0) {
+                await updateScammerIntelligence(intelligence, sessionId, scamDetection);
+                await auditService.logIntelligenceExtracted(sessionId, intelligence);
+            }
+
+            // Check if we should wrap up the conversation
+            const allIntel = await getSessionIntelligence(sessionId);
+            const turnCount = history.length + 2; // +2 for the turns we just saved
+
+            if (shouldWrapUp(turnCount, allIntel)) {
+                // Mark session as final phase
+                await updateSession(sessionId, {
+                    status: "terminated",
+                    engagementPhase: "final"
+                });
+
+                // Send callback if not already sent
+                if (!session.finalCallbackSent) {
+                    const duration = calculateDuration(session.createdAt);
+
+                    const callbackResult = await sendFinalCallback(
+                        sessionId,
+                        allIntel,
+                        {
+                            platform: session.platform,
+                            sender: session.sender,
+                            totalTurns: turnCount,
+                            duration,
+                            engagementPhase: "final",
+                            isScam: true,
+                            scamConfidence: scamDetection.confidence
+                        }
+                    );
+
+                    // Mark callback as sent
+                    await updateSession(sessionId, {
+                        finalCallbackSent: true
+                    });
+
+                    // Log the intelligence report
+                    console.log(formatIntelligenceReport(sessionId, allIntel));
+                }
+            }
+        } else {
+            // Not a scam or not engaging - send neutral response
+            agentReply = "Thank you for your message.";
+            await saveConversationTurn(sessionId, "agent", agentReply);
+        }
+
+        // Prepare response
+        const response = {
+            sessionId,
+            reply: agentReply,
+            isScam: scamDetection.isScam,
+            confidence: scamDetection.confidence,
+            engagementPhase: session.engagementPhase,
+            status: session.status
+        };
+
+        // Include detection details (optional, for debugging)
+        if (process.env.NODE_ENV === 'development') {
+            response.debug = {
+                riskLevel: scamDetection.riskLevel,
+                detectedCategories: scamDetection.categories,
+                extractedIntel: intelligence,
+                analysis: scamDetection.analysis
+            };
+        };
+
+        return res.json(response);
+
+    } catch (error) {
+        console.error("Error handling message:", error);
+
+        return res.status(500).json({
+            error: "Internal server error",
+            message: error.message
+        });
+    }
+};
+
+/**
+ * Get session details (optional endpoint for monitoring)
+ */
+exports.getSession = async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+
+        const Session = require("../models/Session");
+        const session = await Session.findOne({ sessionId });
+
+        if (!session) {
+            return res.status(404).json({
+                error: "Session not found"
+            });
+        }
+
+        const history = await getConversationHistory(sessionId);
+        const intelligence = await getSessionIntelligence(sessionId);
+
+        return res.json({
+            session: {
+                sessionId: session.sessionId,
+                platform: session.platform,
+                sender: session.sender,
+                status: session.status,
+                isScam: session.isScam,
+                engagementPhase: session.engagementPhase,
+                createdAt: session.createdAt,
+                lastActiveAt: session.lastActiveAt,
+                finalCallbackSent: session.finalCallbackSent
+            },
+            conversationTurns: history.length,
+            extractedIntelligence: intelligence
+        });
+
+    } catch (error) {
+        console.error("Error fetching session:", error);
+
+        return res.status(500).json({
+            error: "Internal server error",
+            message: error.message
+        });
+    }
+};

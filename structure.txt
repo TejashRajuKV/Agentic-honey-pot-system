@@ -1,0 +1,10 @@
+src/
+src/server.js
+src/app.js
+src/routes/
+src/controllers/
+src/middleware/
+src/config/
+src/models/
+src/services/
+src/utils/
