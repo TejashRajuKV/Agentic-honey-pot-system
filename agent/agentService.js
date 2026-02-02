@@ -2,7 +2,7 @@
 
 const { buildAgentPrompt } = require('./personaPrompts');
 const { getConversationPhase } = require('./agentStateMachine');
-const { generateRuleBasedResponse } = require('./conversationHandler');
+const { generateRuleBasedResponse, generateEmotionAwareResponse } = require('./conversationHandler');
 const { shouldUseBait, generateBaitResponse, analyzeBaitResponse } = require('./baitStrategy');
 
 // Gemini AI integration (disabled by default)
@@ -36,6 +36,7 @@ if (process.env.LLM_API_KEY && process.env.LLM_API_KEY !== 'your_llm_api_key_her
  */
 async function generateAgentResponse(userMessage, conversationHistory = [], scamContext = {}, sessionData = {}) {
     const { categories = [], confidence = 0, riskLevel = 'SAFE' } = scamContext;
+    const { emotion = 'neutral' } = sessionData; // Get emotion from session
 
     // Determine the conversation context and phase
     const turnCount = conversationHistory.length;
@@ -97,12 +98,13 @@ async function generateAgentResponse(userMessage, conversationHistory = [], scam
 
             } catch (error) {
                 console.error('❌ Gemini API error:', error.message);
-                console.log('   Falling back to rule-based response');
-                response = generateRuleBasedResponse(userMessage, phase, categories);
+                console.log('   Falling back to emotion-aware rule-based response');
+                // Use emotion-aware response
+                response = generateEmotionAwareResponse(userMessage, phase, emotion, categories, conversationHistory);
             }
         } else {
-            // Rule-based fallback responses
-            response = generateRuleBasedResponse(userMessage, phase, categories);
+            // Use emotion-aware rule-based responses
+            response = generateEmotionAwareResponse(userMessage, phase, emotion, categories, conversationHistory);
         }
     }
 

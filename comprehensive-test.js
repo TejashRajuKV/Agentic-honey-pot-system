@@ -120,16 +120,37 @@ async function runTest(message, category, index) {
 
         console.log(`\n${icon} Message: "${message}"`);
         console.log(`   Detection: ${status} (${confidence}% confidence)`);
+        console.log(`   Risk Level: ${data.riskLevel || 'N/A'}`);
         console.log(`   Agent: "${data.reply}"`);
 
         if (data.debug && data.debug.detectedCategories.length > 0) {
             console.log(`   Categories: ${data.debug.detectedCategories.join(', ')}`);
         }
 
-        return { isScam, confidence: parseFloat(confidence) };
+        // Show detection layer breakdown if available
+        if (data.debug && data.debug.analysis) {
+            const analysis = data.debug.analysis;
+            console.log(`   Layer Scores:`);
+            console.log(`     Pattern: ${(analysis.patternScore * 100).toFixed(0)}% | Behavior: ${(analysis.behaviorScore * 100).toFixed(0)}% | Context: ${(analysis.contextScore * 100).toFixed(0)}%`);
+            console.log(`     Intel: ${(analysis.intelScore * 100).toFixed(0)}% | Urgency: ${(analysis.urgencyScore * 100).toFixed(0)}%`);
+        }
+
+        // Show extracted intelligence
+        if (data.debug && data.debug.extractedIntel) {
+            const intel = data.debug.extractedIntel;
+            const hasIntel = intel.upiIds.length > 0 || intel.phoneNumbers.length > 0 || intel.urls.length > 0;
+            if (hasIntel) {
+                console.log(`   Intelligence:`);
+                if (intel.upiIds.length > 0) console.log(`     UPI: ${intel.upiIds.join(', ')}`);
+                if (intel.phoneNumbers.length > 0) console.log(`     Phone: ${intel.phoneNumbers.join(', ')}`);
+                if (intel.urls.length > 0) console.log(`     URLs: ${intel.urls.join(', ')}`);
+            }
+        }
+
+        return { isScam, confidence: parseFloat(confidence), riskLevel: data.riskLevel };
     } catch (error) {
         console.error(`\n❌ Error testing: ${error.message}`);
-        return { isScam: false, confidence: 0 };
+        return { isScam: false, confidence: 0, riskLevel: 'SAFE' };
     }
 }
 
@@ -143,6 +164,7 @@ async function runAllTests() {
     let totalTests = 0;
     let scamsDetected = 0;
     let normalMessagesCorrect = 0;
+    const riskLevels = { SAFE: 0, LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 0 };
 
     for (const scenario of testScenarios) {
         console.log('\n' + '='.repeat(70));
@@ -161,6 +183,11 @@ async function runAllTests() {
                 if (result.isScam) scamsDetected++;
             }
 
+            // Track risk levels
+            if (result.riskLevel) {
+                riskLevels[result.riskLevel]++;
+            }
+
             // Small delay between requests
             await new Promise(resolve => setTimeout(resolve, 300));
         }
@@ -173,6 +200,11 @@ async function runAllTests() {
     console.log(`Scams Detected: ${scamsDetected}/${totalTests - 4}`);
     console.log(`Normal Messages Handled Correctly: ${normalMessagesCorrect}/4`);
     console.log(`\nDetection Rate: ${((scamsDetected / (totalTests - 4)) * 100).toFixed(1)}%`);
+    console.log(`False Negative Rate: ${(((totalTests - 4 - scamsDetected) / (totalTests - 4)) * 100).toFixed(1)}%`);
+    console.log(`False Positive Rate: ${(((4 - normalMessagesCorrect) / 4) * 100).toFixed(1)}%`);
+    console.log(`\nRisk Level Distribution:`);
+    console.log(`  SAFE: ${riskLevels.SAFE} | LOW: ${riskLevels.LOW} | MEDIUM: ${riskLevels.MEDIUM}`);
+    console.log(`  HIGH: ${riskLevels.HIGH} | CRITICAL: ${riskLevels.CRITICAL}`);
     console.log('='.repeat(70));
 }
 

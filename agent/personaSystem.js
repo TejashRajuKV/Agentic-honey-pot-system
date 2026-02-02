@@ -188,27 +188,20 @@ function applyPersona(response, persona, phase) {
         return response;
     }
 
-    // Add persona-specific delays/questions occasionally
-    if (Math.random() < 0.3 && phase === 'mid') {
-        const delay = getPersonaPhrase(persona.type, 'delays');
-        if (delay) {
-            return delay;
-        }
-    }
+    // REMOVED: Random delay injection (30% mid-phase) - breaks conversation flow
+    // Delays avoid important moments instead of engaging with scammer
 
-    // Add persona-specific questions
-    if (Math.random() < 0.25 && phase === 'early') {
-        const question = getPersonaPhrase(persona.type, 'questions');
-        if (question) {
-            return question;
-        }
-    }
+    // REMOVED: Random question injection (25% early-phase) - overshadows edge-case handlers
+    // Edge-case handlers already provide context-specific responses
 
-    // Add persona-specific mistakes
-    if (Math.random() < 0.15) {
+    // Add persona-specific mistakes VERY RARELY (5% chance only)
+    if (Math.random() < 0.05) {
         const mistake = getPersonaPhrase(persona.type, 'mistakes');
         if (mistake) {
-            return `${response} ${mistake}`;
+            // Only append if it's a short typo mention, not full excuse
+            if (mistake.length < 30) {
+                return `${response} ${mistake}`;
+            }
         }
     }
 

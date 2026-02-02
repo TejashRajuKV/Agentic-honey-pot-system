@@ -9,7 +9,8 @@ const {
     getConversationHistory,
     saveConversationTurn,
     determineEngagementPhase,
-    getSessionIntelligence
+    getSessionIntelligence,
+    updateSessionEmotion
 } = require("../services/sessionService");
 const { sendFinalCallback, formatIntelligenceReport } = require("../../agent/callbackService");
 const { sanitizeText, calculateDuration } = require("../utils/helpers");
@@ -18,6 +19,7 @@ const { sanitizeText, calculateDuration } = require("../utils/helpers");
 const { checkKnownScammer, updateScammerIntelligence } = require("../services/crossSessionIntelligence");
 const { selectPersona, applyPersona } = require("../../agent/personaSystem");
 const auditService = require("../services/auditService");
+const { detectEmotion } = require("../../detection/emotionDetector");
 
 /**
  * Handle incoming message from external platform
@@ -56,6 +58,15 @@ exports.handleIncomingMessage = async (req, res) => {
 
         // Get conversation history
         const history = await getConversationHistory(sessionId);
+
+        // EMOTION LAYER: Detect emotion FIRST (before scam detection)
+        const emotionResult = detectEmotion(sanitizedMessage, session.emotionHistory || []);
+        const { emotion, intensity } = emotionResult;
+
+        // Update session with detected emotion
+        await updateSessionEmotion(sessionId, emotion, intensity);
+
+        console.log(`😊 Emotion detected: ${emotion} (intensity: ${intensity.toFixed(2)})`);
 
         // Detect scam intent with conversation context
         const scamDetection = await detectScamIntent(sanitizedMessage, history);
@@ -107,7 +118,10 @@ exports.handleIncomingMessage = async (req, res) => {
         // Determine if we should engage the AI agent
         let agentReply = null;
         let baitMetadata = null;
-        let shouldEngage = scamDetection.isScam || session.isScam === true;
+
+        // CHANGED: Always engage the agent for natural conversation handling
+        // Even non-scam messages need proper responses (de-escalation, clarification, etc.)
+        let shouldEngage = true; // Was: scamDetection.isScam || session.isScam === true
 
         if (shouldEngage) {
             // Generate AI agent response with bait strategy
@@ -117,6 +131,7 @@ exports.handleIncomingMessage = async (req, res) => {
                 history,
                 scamDetection,
                 {
+                    emotion,  // Pass detected emotion
                     lastBaitType: session.lastBaitType,
                     baitUsedCount: session.baitUsedCount || 0
                 }
@@ -175,54 +190,52 @@ exports.handleIncomingMessage = async (req, res) => {
 
             await updateSession(sessionId, sessionUpdates);
 
-            // FEATURE 5: Update cross-session intelligence
-            if (intelligence.upiIds.length > 0 || intelligence.phoneNumbers.length > 0) {
+            // FEATURE 5: Update cross-session intelligence (only if scam detected)
+            if (scamDetection.isScam && (intelligence.upiIds.length > 0 || intelligence.phoneNumbers.length > 0)) {
                 await updateScammerIntelligence(intelligence, sessionId, scamDetection);
                 await auditService.logIntelligenceExtracted(sessionId, intelligence);
             }
 
-            // Check if we should wrap up the conversation
-            const allIntel = await getSessionIntelligence(sessionId);
-            const turnCount = history.length + 2; // +2 for the turns we just saved
+            // Check if we should wrap up the conversation (only for confirmed scams)
+            if (scamDetection.isScam || session.isScam === true) {
+                const allIntel = await getSessionIntelligence(sessionId);
+                const turnCount = history.length + 2; // +2 for the turns we just saved
 
-            if (shouldWrapUp(turnCount, allIntel)) {
-                // Mark session as final phase
-                await updateSession(sessionId, {
-                    status: "terminated",
-                    engagementPhase: "final"
-                });
-
-                // Send callback if not already sent
-                if (!session.finalCallbackSent) {
-                    const duration = calculateDuration(session.createdAt);
-
-                    const callbackResult = await sendFinalCallback(
-                        sessionId,
-                        allIntel,
-                        {
-                            platform: session.platform,
-                            sender: session.sender,
-                            totalTurns: turnCount,
-                            duration,
-                            engagementPhase: "final",
-                            isScam: true,
-                            scamConfidence: scamDetection.confidence
-                        }
-                    );
-
-                    // Mark callback as sent
+                if (shouldWrapUp(turnCount, allIntel)) {
+                    // Mark session as final phase
                     await updateSession(sessionId, {
-                        finalCallbackSent: true
+                        status: "terminated",
+                        engagementPhase: "final"
                     });
 
-                    // Log the intelligence report
-                    console.log(formatIntelligenceReport(sessionId, allIntel));
+                    // Send callback if not already sent
+                    if (!session.finalCallbackSent) {
+                        const duration = calculateDuration(session.createdAt);
+
+                        const callbackResult = await sendFinalCallback(
+                            sessionId,
+                            allIntel,
+                            {
+                                platform: session.platform,
+                                sender: session.sender,
+                                totalTurns: turnCount,
+                                duration,
+                                engagementPhase: "final",
+                                isScam: true,
+                                scamConfidence: scamDetection.confidence
+                            }
+                        );
+
+                        // Mark callback as sent
+                        await updateSession(sessionId, {
+                            finalCallbackSent: true
+                        });
+
+                        // Log the intelligence report
+                        console.log(formatIntelligenceReport(sessionId, allIntel));
+                    }
                 }
             }
-        } else {
-            // Not a scam or not engaging - send neutral response
-            agentReply = "Thank you for your message.";
-            await saveConversationTurn(sessionId, "agent", agentReply);
         }
 
         // Prepare response
@@ -241,7 +254,12 @@ exports.handleIncomingMessage = async (req, res) => {
                 riskLevel: scamDetection.riskLevel,
                 detectedCategories: scamDetection.categories,
                 extractedIntel: intelligence,
-                analysis: scamDetection.analysis
+                analysis: scamDetection.analysis,
+                emotion: {
+                    detected: emotion,
+                    intensity: intensity,
+                    history: session.emotionHistory || []
+                }
             };
         };
 

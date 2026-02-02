@@ -143,11 +143,53 @@ async function getSessionIntelligence(sessionId) {
     };
 }
 
+/**
+ * Update session emotion state
+ * @param {string} sessionId - Session ID
+ * @param {string} emotion - Detected emotion
+ * @param {number} intensity - Emotion intensity (0-1)
+ */
+async function updateSessionEmotion(sessionId, emotion, intensity = 0) {
+    try {
+        const session = await Session.findOne({ sessionId });
+
+        if (!session) {
+            console.error(`Session ${sessionId} not found for emotion update`);
+            return null;
+        }
+
+        // Update emotion history (keep last 10)
+        const emotionHistory = session.emotionHistory || [];
+        emotionHistory.push(emotion);
+
+        // Keep only last 10 emotions
+        const trimmedHistory = emotionHistory.slice(-10);
+
+        await Session.updateOne(
+            { sessionId },
+            {
+                $set: {
+                    currentEmotion: emotion,
+                    emotionHistory: trimmedHistory,
+                    emotionIntensity: intensity,
+                    lastActiveAt: Date.now()
+                }
+            }
+        );
+
+        return { emotion, intensity, history: trimmedHistory };
+    } catch (error) {
+        console.error("Error updating session emotion:", error);
+        return null;
+    }
+}
+
 module.exports = {
     getOrCreateSession,
     updateSession,
     getConversationHistory,
     saveConversationTurn,
     determineEngagementPhase,
-    getSessionIntelligence
+    getSessionIntelligence,
+    updateSessionEmotion
 };

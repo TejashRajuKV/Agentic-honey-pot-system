@@ -25,6 +25,22 @@ const sessionSchema = new Schema({
     baitUsedCount: { type: Number, default: 0 },
     evasionScore: { type: Number, default: 0 },
     triggeredReveal: { type: Boolean, default: false },
+    // Emotion Handling Layer
+    currentEmotion: {
+        type: String,
+        enum: ['neutral', 'confused', 'fear', 'urgent', 'angry', 'excited', 'trusting', 'hesitant'],
+        default: 'neutral'
+    },
+    emotionHistory: {
+        type: [String],
+        default: []
+    },
+    emotionIntensity: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 1
+    },
     // Persona system
     persona: { type: Object, default: null }
 });

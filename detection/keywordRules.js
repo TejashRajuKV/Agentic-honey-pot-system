@@ -85,6 +85,115 @@ const SCAM_PATTERNS = {
         /whatsapp/i,
         /message.*back/i,
         /reply.*with/i,
+    ],
+
+    // Emotional manipulation - Sympathy and social engineering
+    emotionalManipulation: [
+        /please.*help/i,
+        /my.*job.*depends/i,
+        /will.*lose.*job/i,
+        /lose.*job.*if/i,
+        /brother.*trust/i,
+        /sister.*trust/i,
+        /trust.*me/i,
+        /i.*will.*help.*you/i,
+        /helping.*you/i,
+        /don'?t.*worry/i,
+        /no.*need.*to.*worry/i,
+        /relax.*i.*help/i,
+    ],
+
+    // Authority validation - References and legal threats
+    authorityValidation: [
+        /rbi.*circular/i,
+        /government.*circular/i,
+        /as.*per.*rbi/i,
+        /section.*\d+/i,
+        /under.*section/i,
+        /legal.*action/i,
+        /court.*case/i,
+        /file.*complaint/i,
+        /police.*complaint/i,
+        /arrest.*warrant/i,
+        /penalty.*fine/i,
+        /summon/i,
+        /notice.*issued/i,
+    ],
+
+    // Multilingual patterns - Hindi/Hinglish (basic detection)
+    multilingual: [
+        /\babhi\s+karo\b/i,          // do it now
+        /\bjaldi\b/i,                // quickly
+        /\bbaad\s+mein\s+problem\b/i, // later problem
+        /\bkaro\s+na\b/i,            // please do
+        /\bplease\s+karo\b/i,        // please do (hinglish)
+        /\baap\s+ka\b/i,             // your (formal)
+        /\bbhej\s+do\b/i,            // send it
+        /\bverify\s+karo\b/i,        // verify (hinglish)
+        /\bkyun\s+nahi\b/i,          // why not
+    ],
+
+    // Professional scam - Polite and formal language
+    professionalScam: [
+        /as.*discussed/i,
+        /thank.*you.*for.*cooperation/i,
+        /please.*complete.*verification/i,
+        /kindly.*verify/i,
+        /request.*you.*to/i,
+        /we.*appreciate.*your/i,
+        /good.*afternoon/i,
+        /dear.*customer/i,
+        /valued.*customer/i,
+        /imps.*timeout/i,
+        /error.*code.*\d+/i,
+        /transaction.*failed.*code/i,
+        /system.*error/i,
+    ],
+
+    // Brand impersonation - Fake company claims
+    brandImpersonation: [
+        /this.*is.*amazon/i,
+        /amazon.*support/i,
+        /flipkart.*support/i,
+        /google.*pay/i,
+        /paytm.*support/i,
+        /phonepe.*support/i,
+        /from.*amazon/i,
+        /from.*flipkart/i,
+        /official.*support/i,
+        /customer.*care.*calling/i,
+    ],
+
+    // Multiple requests pattern - Cognitive overload
+    multipleRequests: [
+        /click.*and.*send/i,
+        /send.*and.*confirm/i,
+        /verify.*and.*click/i,
+        /first.*then.*after/i,
+        /step.*\d+.*step.*\d+/i,
+    ],
+
+    // Repetition indicators - For silent pressure detection
+    repetitionIndicators: [
+        /again/i,
+        /once.*more/i,
+        /told.*you/i,
+        /asked.*you/i,
+        /waiting.*for/i,
+        /still.*waiting/i,
+    ],
+
+    // Aggression patterns - Rage phase detection
+    aggression: [
+        /wasting.*time/i,
+        /time.*waste/i,
+        /why.*not.*responding/i,
+        /not.*listening/i,
+        /you.*stupid/i,
+        /idiot/i,
+        /fool/i,
+        /nonsense/i,
+        /useless/i,
     ]
 };
 
@@ -142,6 +251,48 @@ const SCAM_PHRASES = [
     'atm pin',
     'upi pin',
     'send money',
+
+    // Emotional manipulation
+    'please help me',
+    'my job depends',
+    'will lose my job',
+    'trust me brother',
+    'don\'t worry i will help',
+    'no need to worry',
+
+    // Authority claims
+    'rbi circular',
+    'government order',
+    'legal action',
+    'court case',
+    'police complaint',
+    'as per section',
+
+    // Professional scam
+    'as discussed',
+    'thank you for cooperation',
+    'please complete verification',
+    'kindly verify',
+    'imps timeout error',
+    'error code',
+
+    // Brand impersonation
+    'amazon support',
+    'flipkart support',
+    'google pay support',
+    'paytm customer care',
+    'official support',
+
+    // Small amount trap
+    'send ₹1',
+    'send ₹5',
+    'just ₹1 for verification',
+    'only ₹5',
+
+    // Mixed tactics
+    'account blocked don\'t worry',
+    'problem but i will help',
+    'urgent but don\'t panic',
 ];
 
 module.exports = {

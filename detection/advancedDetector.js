@@ -61,7 +61,7 @@ function advancedScamDetection(message, conversationHistory = []) {
     const riskLevel = getRiskLevel(totalScore);
 
     return {
-        isScam: totalScore > 0.3, // 30% threshold
+        isScam: totalScore > 0.15, // 15% threshold (lowered to catch subtle scams)
         confidence: Math.min(totalScore, 1.0),
         riskLevel,
         categories: uniqueCategories,
@@ -158,6 +158,30 @@ function analyzeBehavior(msg, history) {
         patterns.push('escalating_pressure');
     }
 
+    // EDGE CASE: Slow-burn pattern detection
+    const slowBurn = detectSlowBurnPattern(history);
+    if (slowBurn.detected) {
+        score += slowBurn.score;
+        patterns.push(slowBurn.pattern);
+        categories.push('slow_burn');
+    }
+
+    // EDGE CASE: Repetition pattern (silent pressure)
+    const repetition = detectRepetitionPattern(history, msg);
+    if (repetition.detected) {
+        score += repetition.score;
+        patterns.push(repetition.pattern);
+        categories.push('silent_pressure');
+    }
+
+    // EDGE CASE: Emotional manipulation
+    const emotional = detectEmotionalManipulation(msg);
+    if (emotional.detected) {
+        score += emotional.score;
+        patterns.push(...emotional.patterns);
+        categories.push('emotional_manipulation');
+    }
+
     return { score: Math.min(score, 1.0), categories, patterns };
 }
 
@@ -199,6 +223,14 @@ function analyzeContext(msg, history) {
         score += 0.3;
         categories.push('banking');
         patterns.push('authority_impersonation');
+    }
+
+    // EDGE CASE: Contradiction detection (false compliance trap)
+    const contradiction = detectContradiction(history, msg);
+    if (contradiction.detected) {
+        score += contradiction.score;
+        patterns.push(contradiction.pattern);
+        categories.push('contradiction');
     }
 
     return { score: Math.min(score, 1.0), categories, patterns };
@@ -273,6 +305,137 @@ function analyzeUrgency(msg) {
     }
 
     return { score: Math.min(score, 1.0) };
+}
+
+/**
+ * Detect slow-burn scam patterns (no urgency initially, builds over time)
+ * @param {Array} history - Conversation history
+ * @returns {Object} - Detection result
+ */
+function detectSlowBurnPattern(history) {
+    if (history.length < 3) return { detected: false, score: 0 };
+
+    const userMessages = history.filter(h => h.role === 'user').map(h => h.text.toLowerCase());
+
+    // Check if early messages have no urgency
+    const earlyMessages = userMessages.slice(0, 2);
+    const earlyUrgency = earlyMessages.some(msg =>
+        /urgent|immediate|now|quick|hurry/i.test(msg)
+    );
+
+    // Check if later messages introduce urgency
+    const laterMessages = userMessages.slice(2);
+    const laterUrgency = laterMessages.some(msg =>
+        /urgent|immediate|now|quick|hurry/i.test(msg)
+    );
+
+    if (!earlyUrgency && laterUrgency && userMessages.length >= 3) {
+        return { detected: true, score: 0.4, pattern: 'slow_burn_escalation' };
+    }
+
+    return { detected: false, score: 0 };
+}
+
+/**
+ * Detect contradictions in scammer's statements
+ * @param {Array} history - Conversation history
+ * @param {string} currentMessage - Current message
+ * @returns {Object} - Detection result
+ */
+function detectContradiction(history, currentMessage) {
+    if (history.length === 0) return { detected: false, score: 0 };
+
+    const userMessages = history.filter(h => h.role === 'user').map(h => h.text.toLowerCase());
+    const current = currentMessage.toLowerCase();
+
+    // Check for "no money needed" followed by money request
+    const noMoneyBefore = userMessages.some(msg =>
+        /no.*money.*needed|free.*service|no.*payment|only.*verification/i.test(msg)
+    );
+    const moneyNow = /send.*money|pay|transfer|₹|\d+.*rupees/i.test(current);
+
+    if (noMoneyBefore && moneyNow) {
+        return { detected: true, score: 0.7, pattern: 'false_compliance_trap' };
+    }
+
+    // Check for identity switch ("I am X" -> "My senior is Y")
+    const identityBefore = userMessages.some(msg =>
+        /this.*is|i.*am|my.*name/i.test(msg)
+    );
+    const identitySwitch = /transfer.*to.*senior|connect.*to.*officer|another.*person/i.test(current);
+
+    if (identityBefore && identitySwitch) {
+        return { detected: true, score: 0.5, pattern: 'identity_switch' };
+    }
+
+    return { detected: false, score: 0 };
+}
+
+/**
+ * Detect emotional manipulation patterns
+ * @param {string} message - Message to analyze
+ * @returns {Object} - Detection result
+ */
+function detectEmotionalManipulation(message) {
+    const msg = message.toLowerCase();
+    let score = 0;
+    const patterns = [];
+
+    // Sympathy tactics
+    if (/please.*help|my.*job.*depends|will.*lose.*job/i.test(msg)) {
+        score += 0.4;
+        patterns.push('sympathy_manipulation');
+    }
+
+    // Over-friendly social engineering
+    if (/brother.*trust|sister.*trust|trust.*me.*bro|believe.*me/i.test(msg)) {
+        score += 0.3;
+        patterns.push('over_friendly');
+    }
+
+    // Threat + help combo (mixed emotional tactics)
+    if (/block|suspend|problem/i.test(msg) && /don'?t.*worry|i.*will.*help|no.*need.*to.*worry/i.test(msg)) {
+        score += 0.5;
+        patterns.push('threat_with_help');
+    }
+
+    return {
+        detected: score > 0,
+        score: Math.min(score, 1.0),
+        patterns
+    };
+}
+
+/**
+ * Detect repetition patterns (silent pressure)
+ * @param {Array} history - Conversation history
+ * @param {string} currentMessage - Current message
+ * @returns {Object} - Detection result
+ */
+function detectRepetitionPattern(history, currentMessage) {
+    if (history.length < 2) return { detected: false, score: 0, count: 0 };
+
+    const userMessages = history.filter(h => h.role === 'user').map(h => h.text.toLowerCase());
+    const current = currentMessage.toLowerCase();
+
+    // Count how many times similar message was sent
+    let repetitionCount = 0;
+    for (const msg of userMessages) {
+        if (calculateSimilarity(current, msg) > 0.7) {
+            repetitionCount++;
+        }
+    }
+
+    if (repetitionCount >= 2) {
+        return {
+            detected: true,
+            score: Math.min(0.3 + (repetitionCount * 0.1), 0.8),
+            count: repetitionCount,
+            pattern: 'silent_pressure_repetition'
+        };
+    }
+
+    return { detected: false, score: 0, count: 0 };
 }
 
 /**
