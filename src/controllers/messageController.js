@@ -25,22 +25,35 @@ const { detectEmotion } = require("../../detection/emotionDetector");
  * Handle incoming message from external platform
  * Main entry point for the honeypot system
  * 
- * Supports TWO request formats:
+ * Supports MULTIPLE request formats:
  * 1. New format (evaluation platform):
  *    { sessionId, message: { sender, text, timestamp }, conversationHistory: [], metadata: {} }
  * 2. Legacy format:
  *    { sessionId, message: "text", platform, sender }
+ * 3. Simple test format:
+ *    { message: "text" } or { text: "text" }
  */
 exports.handleIncomingMessage = async (req, res) => {
     try {
-        const { sessionId, message, conversationHistory: providedHistory, metadata } = req.body;
+        let { sessionId, message, conversationHistory: providedHistory, metadata, text } = req.body;
 
-        // Validate required fields
-        if (!sessionId || !message) {
-            return res.status(400).json({
-                error: "Missing required fields",
-                required: ["sessionId", "message"]
+        // Handle various message formats from GUVI tester
+        // Support: { message: "text" }, { text: "text" }, { message: { text: "..." } }
+        if (!message && text) {
+            message = text; // Support { text: "..." } format
+        }
+
+        // If no message at all, return helpful test response
+        if (!message) {
+            return res.json({
+                status: "success",
+                reply: "Honeypot API is active. Send a message to start."
             });
+        }
+
+        // Auto-generate sessionId if not provided
+        if (!sessionId) {
+            sessionId = `auto_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         }
 
         // Handle both new format (object) and legacy format (string)
@@ -53,7 +66,7 @@ exports.handleIncomingMessage = async (req, res) => {
             platform = metadata?.channel || 'API';
         } else {
             // Legacy format (backward compatibility)
-            messageText = message;
+            messageText = String(message);
             sender = req.body.sender || 'scammer';
             platform = req.body.platform || 'API';
         }
