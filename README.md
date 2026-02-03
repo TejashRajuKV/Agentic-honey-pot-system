@@ -164,7 +164,87 @@ The server will start on `http://localhost:3000`
 
 ## 📖 Usage
 
-### Basic API Call
+### 🎯 GUVI Evaluation Endpoint
+
+**Base URL**: `https://your-app.onrender.com`
+
+**API Endpoint**: `https://your-app.onrender.com/api/v1/messages`
+
+> ⚠️ **Important**: Use the full URL ending with `/api/v1/messages` - the root URL `/` only returns a health check message.
+
+---
+
+### API Request Format (GUVI Evaluation Platform)
+
+```bash
+curl -X POST https://your-app.onrender.com/api/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -d '{
+    "sessionId": "wertyu-dfghj-ertyui",
+    "message": {
+      "sender": "scammer",
+      "text": "Your bank account will be blocked today. Verify immediately.",
+      "timestamp": 1770005528731
+    },
+    "conversationHistory": [],
+    "metadata": {
+      "channel": "SMS",
+      "language": "English",
+      "locale": "IN"
+    }
+  }'
+```
+
+### API Response Format
+
+```json
+{
+  "status": "success",
+  "reply": "Can you explain this more clearly? I'm a bit confused."
+}
+```
+
+---
+
+### 📤 Mandatory Final Callback (GUVI Evaluation)
+
+When scam is confirmed and engagement is complete, the system automatically sends intelligence to:
+
+**Endpoint**: `POST https://hackathon.guvi.in/api/updateHoneyPotFinalResult`
+
+**Payload**:
+```json
+{
+  "sessionId": "abc123-session-id",
+  "scamDetected": true,
+  "totalMessagesExchanged": 18,
+  "extractedIntelligence": {
+    "bankAccounts": [],
+    "upiIds": ["scammer@upi"],
+    "phishingLinks": ["http://malicious-link.example"],
+    "phoneNumbers": ["+91XXXXXXXXXX"],
+    "suspiciousKeywords": ["urgent", "verify now", "account blocked"]
+  },
+  "agentNotes": "Scammer used urgency tactics and payment redirection"
+}
+```
+
+---
+
+### 🔐 Authentication
+
+All API requests require the `x-api-key` header:
+
+```
+x-api-key: honeypot_secret_key_2026
+```
+
+Use the same API key you set in Render's environment variables.
+
+---
+
+### Legacy Request Format (Also Supported)
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/messages \
@@ -177,24 +257,6 @@ curl -X POST http://localhost:3000/api/v1/messages \
   }'
 ```
 
-### Response Example
-
-```json
-{
-  "sessionId": "demo_session_1",
-  "reply": "Blocked? Oh no! What's the problem? Can you explain?",
-  "isScam": true,
-  "confidence": 0.87,
-  "riskLevel": "HIGH",
-  "engagementPhase": "early",
-  "status": "active",
-  "detectedPatterns": ["banking", "urgency", "authorityValidation"],
-  "extractedIntel": {
-    "urgencyPhrases": ["urgent"],
-    "behavioralPatterns": ["threat_of_consequences"]
-  }
-}
-```
 
 ---
 
