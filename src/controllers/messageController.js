@@ -35,7 +35,9 @@ const { detectEmotion } = require("../../detection/emotionDetector");
  */
 exports.handleIncomingMessage = async (req, res) => {
     try {
-        let { sessionId, message, conversationHistory: providedHistory, metadata, text } = req.body;
+        // Handle empty or null body
+        const body = req.body || {};
+        let { sessionId, message, conversationHistory: providedHistory, metadata, text } = body;
 
         // Handle various message formats from GUVI tester
         // Support: { message: "text" }, { text: "text" }, { message: { text: "..." } }
@@ -43,7 +45,7 @@ exports.handleIncomingMessage = async (req, res) => {
             message = text; // Support { text: "..." } format
         }
 
-        // If no message at all, return helpful test response
+        // If no message at all, return helpful test response (for GUVI tester validation)
         if (!message) {
             return res.json({
                 status: "success",
