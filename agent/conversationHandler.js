@@ -431,7 +431,7 @@ function generateRuleBasedResponse(userMessage, phase, categories = [], conversa
             ]);
         }
 
-        return "I'm following along carefully. What information do you need from me next?";
+        return "I understand your situation, but I still don't see why this involves my account. Can you explain?";
     }
 
     // LEVEL 3 & 4: Delay + Information Extraction - Context-aware friction
@@ -739,7 +739,6 @@ function addHumanImperfections(response) {
     if (Math.random() < 0.15) {
         const imperfections = [
             (r) => r + ' pls', // Add 'pls'
-            (r) => r.replace(/I'm/g, 'im'), // Grammar slip
             (r) => r.replace(/\./g, '..'), // Extra dots
         ];
 
@@ -941,10 +940,10 @@ function handleSlowBurnEscalation(context) {
     // Don't trigger if there are already scam signals
     if (turnCount === 0 && !context.earlyUrgency && !context.hasScamSignals) {
         return pickRandom([
-            "Hello. Yes, what is this regarding?",
+            "Hello. Yes, I saw your message. What is this regarding?",
             "Hi, what can I help you with?",
             "Yes, I'm here. What did you need?",
-            "Okay, what's this about?"
+            "Hello. Yes, what is this about?"
         ]);
     }
 
@@ -1064,7 +1063,7 @@ function handleUrgentEmotion(phase, context) {
         ]);
     } else if (phase === 'mid') {
         return pickRandom([
-            "I know you're in a hurry, but I'm being as careful as I can.",
+            "I understand the urgency, but I need to verify this carefully.",
             "I'm going as fast as I can. Please bear with me.",
             "I understand the deadline, but I need to verify this first.",
             "Let me just double-check this before we proceed."

@@ -88,7 +88,10 @@ honeypot-backend/
 │   ├── test-bait-strategy.js          # Bait strategy validation
 │   ├── test-advanced-detection.js     # Detection accuracy tests
 │   ├── test-emotion-detection.js      # Emotion detection tests
-│   └── test-multi-turn.js             # Multi-turn conversation tests
+│   ├── test-multi-turn.js             # Multi-turn conversation tests
+│   ├── test-governor.js               # Response governor tests
+│   ├── test-honeypot.js               # Honeypot integration tests
+│   └── test-storage.js                # Storage/database tests
 ├── .env                               # Environment configuration
 ├── package.json
 └── Documentation/
@@ -229,6 +232,43 @@ node test-emotion-detection.js
 **Multi-Turn Conversation Testing**:
 ```bash
 node test-multi-turn.js
+```
+
+**Response Governor Testing**:
+```bash
+node test-governor.js
+```
+
+**Honeypot Integration Testing**:
+```bash
+node test-honeypot.js
+```
+
+**Storage Testing**:
+```bash
+node test-storage.js
+```
+
+**Comprehensive Test Suite**:
+```bash
+node comprehensive-test.js
+```
+
+**Interactive Testing Mode**:
+```bash
+node interactive-test.js
+```
+
+### Utility Commands
+
+**Check MongoDB Connection**:
+```bash
+node check-mongodb.js
+```
+
+**Quick Test Fix**:
+```bash
+node quick-test-fix.js
 ```
 
 ### Test Coverage

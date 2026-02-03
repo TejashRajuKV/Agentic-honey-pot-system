@@ -42,7 +42,42 @@ const sessionSchema = new Schema({
         max: 1
     },
     // Persona system
-    persona: { type: Object, default: null }
+    persona: { type: Object, default: null },
+
+    // ========================================================================
+    // RESPONSE GOVERNOR STATE (MONOTONIC - NEVER REGRESSES)
+    // ========================================================================
+
+    // Peak risk ever detected in this session (can only increase)
+    peakRisk: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 1
+    },
+
+    // Current response mode (one-way: NORMAL → DEFENSIVE → BLOCKING → TERMINATE)
+    responseMode: {
+        type: String,
+        enum: ['NORMAL', 'DEFENSIVE', 'BLOCKING', 'TERMINATE'],
+        default: 'NORMAL'
+    },
+
+    // Timestamp when mode was locked (for audit trail)
+    responseModeLockedAt: {
+        type: Date,
+        default: null
+    },
+    // FSM State tracking
+    fsmState: {
+        type: String,
+        enum: ['SAFE', 'SUSPICIOUS', 'HIGH_RISK', 'CONFIRMED_SCAM', 'TERMINATED'],
+        default: 'SAFE'
+    },
+    fsmScenario: {
+        type: String,
+        default: null
+    }
 });
 
 module.exports = mongoose.model("Session", sessionSchema);

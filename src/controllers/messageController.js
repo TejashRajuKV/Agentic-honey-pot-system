@@ -24,10 +24,16 @@ const { detectEmotion } = require("../../detection/emotionDetector");
 /**
  * Handle incoming message from external platform
  * Main entry point for the honeypot system
+ * 
+ * Supports TWO request formats:
+ * 1. New format (evaluation platform):
+ *    { sessionId, message: { sender, text, timestamp }, conversationHistory: [], metadata: {} }
+ * 2. Legacy format:
+ *    { sessionId, message: "text", platform, sender }
  */
 exports.handleIncomingMessage = async (req, res) => {
     try {
-        const { sessionId, message, platform, sender } = req.body;
+        const { sessionId, message, conversationHistory: providedHistory, metadata } = req.body;
 
         // Validate required fields
         if (!sessionId || !message) {
@@ -37,8 +43,23 @@ exports.handleIncomingMessage = async (req, res) => {
             });
         }
 
+        // Handle both new format (object) and legacy format (string)
+        let messageText, sender, platform, timestamp;
+        if (typeof message === 'object' && message.text) {
+            // New evaluation platform format
+            messageText = message.text;
+            sender = message.sender || 'scammer';
+            timestamp = message.timestamp;
+            platform = metadata?.channel || 'API';
+        } else {
+            // Legacy format (backward compatibility)
+            messageText = message;
+            sender = req.body.sender || 'scammer';
+            platform = req.body.platform || 'API';
+        }
+
         // Sanitize input
-        const sanitizedMessage = sanitizeText(message);
+        const sanitizedMessage = sanitizeText(messageText);
 
         // Get or create session
         const session = await getOrCreateSession(sessionId, platform, sender);
@@ -48,6 +69,7 @@ exports.handleIncomingMessage = async (req, res) => {
             const persona = selectPersona();
             session.persona = persona;
             await updateSession(sessionId, { persona });
+
             console.log(`🎭 Persona assigned: ${persona.name}`);
         }
 
@@ -56,8 +78,18 @@ exports.handleIncomingMessage = async (req, res) => {
             await auditService.logSessionStart(sessionId, platform, sender);
         }
 
-        // Get conversation history
-        const history = await getConversationHistory(sessionId);
+        // Get conversation history - prefer provided history, fall back to database
+        let history;
+        if (providedHistory && Array.isArray(providedHistory) && providedHistory.length > 0) {
+            // Map evaluation platform format to internal format
+            history = providedHistory.map(turn => ({
+                role: turn.sender === 'user' ? 'agent' : 'user', // 'user' in their format = our agent, 'scammer' = user
+                text: turn.text,
+                timestamp: turn.timestamp
+            }));
+        } else {
+            history = await getConversationHistory(sessionId);
+        }
 
         // EMOTION LAYER: Detect emotion FIRST (before scam detection)
         const emotionResult = detectEmotion(sanitizedMessage, session.emotionHistory || []);
@@ -70,6 +102,7 @@ exports.handleIncomingMessage = async (req, res) => {
 
         // Detect scam intent with conversation context
         const scamDetection = await detectScamIntent(sanitizedMessage, history);
+
 
         // Extract intelligence from the message
         const intelligence = extractIntelligence(sanitizedMessage);
@@ -116,8 +149,12 @@ exports.handleIncomingMessage = async (req, res) => {
         }
 
         // Determine if we should engage the AI agent
-        let agentReply = null;
+        let agentReply = "I'm not sure how to respond to that.";
         let baitMetadata = null;
+        let sessionUpdates = {
+            fsmState: session.fsmState || 'SAFE',
+            fsmScenario: session.fsmScenario || null
+        };
 
         // CHANGED: Always engage the agent for natural conversation handling
         // Even non-scam messages need proper responses (de-escalation, clarification, etc.)
@@ -133,7 +170,8 @@ exports.handleIncomingMessage = async (req, res) => {
                 {
                     emotion,  // Pass detected emotion
                     lastBaitType: session.lastBaitType,
-                    baitUsedCount: session.baitUsedCount || 0
+                    baitUsedCount: session.baitUsedCount || 0,
+                    fsmState: session.fsmState || 'SAFE'
                 }
             );
 
@@ -167,8 +205,13 @@ exports.handleIncomingMessage = async (req, res) => {
                 await auditService.logBaitDeployed(sessionId, baitMetadata.baitType, phase);
             }
 
-            // Update session with bait tracking
-            const sessionUpdates = { engagementPhase: phase };
+            // Update session with bait and FSM tracking
+            sessionUpdates = { // Update the existing 'let' variable
+                ...sessionUpdates,
+                engagementPhase: phase,
+                fsmState: baitMetadata?.fsmState || session.fsmState,
+                fsmScenario: baitMetadata?.fsmScenario || session.fsmScenario
+            };
 
             if (baitMetadata && baitMetadata.usedBait) {
                 sessionUpdates.lastBaitType = baitMetadata.baitType;
@@ -222,7 +265,8 @@ exports.handleIncomingMessage = async (req, res) => {
                                 duration,
                                 engagementPhase: "final",
                                 isScam: true,
-                                scamConfidence: scamDetection.confidence
+                                scamConfidence: scamDetection.confidence,
+                                fsmState: sessionUpdates.fsmState || session.fsmState
                             }
                         );
 
@@ -238,29 +282,10 @@ exports.handleIncomingMessage = async (req, res) => {
             }
         }
 
-        // Prepare response
+        // Prepare response - simplified format for evaluation platform
         const response = {
-            sessionId,
-            reply: agentReply,
-            isScam: scamDetection.isScam,
-            confidence: scamDetection.confidence,
-            engagementPhase: session.engagementPhase,
-            status: session.status
-        };
-
-        // Include detection details (optional, for debugging)
-        if (process.env.NODE_ENV === 'development') {
-            response.debug = {
-                riskLevel: scamDetection.riskLevel,
-                detectedCategories: scamDetection.categories,
-                extractedIntel: intelligence,
-                analysis: scamDetection.analysis,
-                emotion: {
-                    detected: emotion,
-                    intensity: intensity,
-                    history: session.emotionHistory || []
-                }
-            };
+            status: "success",
+            reply: agentReply
         };
 
         return res.json(response);

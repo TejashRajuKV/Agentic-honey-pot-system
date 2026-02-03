@@ -2,82 +2,69 @@
 
 /**
  * Callback Service
- * Sends final intelligence report to the evaluation platform
+ * Sends final intelligence report to the GUVI evaluation platform
+ * MANDATORY for hackathon evaluation
  */
 
+// GUVI Evaluation Endpoint (hardcoded as required)
+const GUVI_CALLBACK_URL = "https://hackathon.guvi.in/api/updateHoneyPotFinalResult";
+
 /**
- * Send final callback to evaluation endpoint
+ * Send final callback to GUVI evaluation endpoint
+ * This is MANDATORY and must be called after:
+ * - Scam intent is confirmed
+ * - AI Agent has completed engagement
+ * - Intelligence extraction is finished
+ * 
  * @param {string} sessionId - Session identifier
  * @param {Object} intelligence - Extracted intelligence data
  * @param {Object} sessionData - Session metadata
  * @returns {Object} - Callback response
  */
 async function sendFinalCallback(sessionId, intelligence, sessionData) {
-    const callbackUrl = process.env.EVALUATION_CALLBACK_URL;
-
-    if (!callbackUrl || callbackUrl === 'https://evaluation-platform.example.com/callback') {
-        console.log('⚠️  Evaluation callback URL not configured. Skipping callback.');
-        console.log('📊 Intelligence Report:', JSON.stringify({
-            sessionId,
-            intelligence,
-            sessionData
-        }, null, 2));
-        return { success: false, message: 'Callback URL not configured' };
-    }
-
+    // Build payload in GUVI's required format
     const payload = {
-        sessionId,
-        timestamp: new Date().toISOString(),
-        intelligence: {
+        sessionId: sessionId,
+        scamDetected: true,
+        totalMessagesExchanged: sessionData.totalTurns || 0,
+        extractedIntelligence: {
+            bankAccounts: [], // Not currently extracted, placeholder
             upiIds: intelligence.upiIds || [],
+            phishingLinks: intelligence.urls || [],
             phoneNumbers: intelligence.phoneNumbers || [],
-            urls: intelligence.urls || [],
-            scamPhrases: intelligence.scamPhrases || [],
-            behavioralPatterns: intelligence.behavioralPatterns || []
+            suspiciousKeywords: intelligence.scamPhrases || []
         },
-        sessionMetadata: {
-            platform: sessionData.platform,
-            sender: sessionData.sender,
-            totalTurns: sessionData.totalTurns || 0,
-            duration: sessionData.duration || 0,
-            engagementPhase: sessionData.engagementPhase,
-            scamConfidence: sessionData.scamConfidence || 0
-        },
-        summary: {
-            scamDetected: sessionData.isScam || false,
-            intelligenceExtracted: (
-                intelligence.upiIds?.length > 0 ||
-                intelligence.phoneNumbers?.length > 0 ||
-                intelligence.urls?.length > 0
-            ),
-            totalIntelItems: (
-                (intelligence.upiIds?.length || 0) +
-                (intelligence.phoneNumbers?.length || 0) +
-                (intelligence.urls?.length || 0)
-            )
-        }
+        agentNotes: generateAgentNotes(intelligence, sessionData)
     };
+
+    console.log('📤 Sending final result to GUVI evaluation endpoint...');
+    console.log('📊 Payload:', JSON.stringify(payload, null, 2));
 
     try {
         const fetch = (await import('node-fetch')).default;
 
-        const response = await fetch(callbackUrl, {
+        const response = await fetch(GUVI_CALLBACK_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'User-Agent': 'Honeypot-Backend/1.0'
             },
             body: JSON.stringify(payload),
-            timeout: 10000 // 10 second timeout
+            timeout: 15000 // 15 second timeout
         });
 
         if (!response.ok) {
             throw new Error(`Callback failed with status ${response.status}`);
         }
 
-        const responseData = await response.json();
+        let responseData;
+        try {
+            responseData = await response.json();
+        } catch {
+            responseData = { status: 'acknowledged' };
+        }
 
-        console.log('✅ Successfully sent callback to evaluation platform');
+        console.log('✅ Successfully sent final result to GUVI');
         console.log('📊 Response:', responseData);
 
         return {
@@ -86,7 +73,7 @@ async function sendFinalCallback(sessionId, intelligence, sessionData) {
         };
 
     } catch (error) {
-        console.error('❌ Failed to send callback:', error.message);
+        console.error('❌ Failed to send callback to GUVI:', error.message);
 
         return {
             success: false,
@@ -94,6 +81,40 @@ async function sendFinalCallback(sessionId, intelligence, sessionData) {
         };
     }
 }
+
+/**
+ * Generate agent notes summarizing the scam tactics detected
+ * @param {Object} intelligence - Extracted intelligence
+ * @param {Object} sessionData - Session data
+ * @returns {string} - Summary notes
+ */
+function generateAgentNotes(intelligence, sessionData) {
+    const notes = [];
+
+    if (intelligence.behavioralPatterns?.includes('urgency_tactics')) {
+        notes.push('Scammer used urgency tactics');
+    }
+    if (intelligence.behavioralPatterns?.includes('authority_impersonation')) {
+        notes.push('Authority impersonation detected');
+    }
+    if (intelligence.urls?.length > 0) {
+        notes.push('Phishing links shared');
+    }
+    if (intelligence.upiIds?.length > 0) {
+        notes.push('UPI payment redirection attempted');
+    }
+    if (intelligence.phoneNumbers?.length > 0) {
+        notes.push('Phone numbers shared for contact');
+    }
+    if (sessionData.fsmState === 'TERMINATED') {
+        notes.push('Conversation terminated due to abuse');
+    }
+
+    return notes.length > 0
+        ? notes.join('. ') + '.'
+        : 'Scam detected based on message patterns and behavioral analysis.';
+}
+
 
 /**
  * Format intelligence report for logging/debugging

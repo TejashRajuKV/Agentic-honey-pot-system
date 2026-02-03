@@ -79,8 +79,10 @@ const SCAM_PATTERNS = {
     // Contact requests - Asking for personal info
     contactRequests: [
         /send.*(details|info|number|otp|pin)/i,
-        /share.*(number|details|otp|pin)/i,
-        /provide.*(number|details|info)/i,
+        /share.*(number|details|otp|pin|upi)/i,
+        /share.*upi.*id/i,
+        /send.*upi.*id/i,
+        /provide.*(number|details|info|upi)/i,
         /call.*(back|me|now)/i,
         /whatsapp/i,
         /message.*back/i,
