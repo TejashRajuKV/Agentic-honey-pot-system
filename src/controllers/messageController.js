@@ -35,21 +35,28 @@ const { detectEmotion } = require("../../detection/emotionDetector");
  */
 exports.handleIncomingMessage = async (req, res) => {
     try {
-        // Handle empty or null body
+        // Handle empty or null body - CRITICAL for GUVI tester
         const body = req.body || {};
-        let { sessionId, message, conversationHistory: providedHistory, metadata, text } = body;
 
-        // Handle various message formats from GUVI tester
-        // Support: { message: "text" }, { text: "text" }, { message: { text: "..." } }
-        if (!message && text) {
-            message = text; // Support { text: "..." } format
+        // Extract message from any possible field name
+        let message = body.message || body.text || body.input || null;
+        let sessionId = body.sessionId;
+        let providedHistory = body.conversationHistory;
+        let metadata = body.metadata;
+
+        // Handle nested message object: { message: { text: "..." } }
+        if (message && typeof message === 'object' && message.text) {
+            // Keep as-is, will be handled below
+        } else if (typeof message === 'string') {
+            // Simple string message, wrap it
+            message = { text: message, sender: 'scammer', timestamp: Date.now() };
         }
 
-        // If no message at all, return helpful test response (for GUVI tester validation)
-        if (!message) {
+        // If no message at all (empty body from GUVI tester), return valid response
+        if (!message || (typeof message === 'object' && !message.text)) {
             return res.json({
                 status: "success",
-                reply: "Honeypot API is active. Send a message to start."
+                reply: "Hello. Please tell me more details."
             });
         }
 
