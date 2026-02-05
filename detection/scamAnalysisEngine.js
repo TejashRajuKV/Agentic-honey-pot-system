@@ -179,7 +179,7 @@ function calculatePressureVelocity(conversationHistory = [], currentMessage = ''
         // First message - check if it has pressure words
         const urgencyCount = urgencyWords.filter(w => currentMessage.toLowerCase().includes(w)).length;
         const pressureCount = pressureWords.filter(w => currentMessage.toLowerCase().includes(w)).length;
-        
+
         if (urgencyCount + pressureCount >= 2) {
             return { velocity: 'fast', score: 0.7 };
         }
@@ -205,7 +205,7 @@ function calculatePressureVelocity(conversationHistory = [], currentMessage = ''
 
     // Calculate escalation rate
     const turnCount = userMessages.length + 1;
-    
+
     if (turnCount <= 2) {
         // OTP in first 2 messages = FAST escalation
         if ((currentUrgency + currentPressure) >= 2) {
@@ -217,7 +217,7 @@ function calculatePressureVelocity(conversationHistory = [], currentMessage = ''
     // Calculate escalation trend
     const firstHalf = pressureProgression.slice(0, Math.floor(pressureProgression.length / 2));
     const secondHalf = pressureProgression.slice(Math.floor(pressureProgression.length / 2));
-    
+
     const firstAvg = firstHalf.length > 0 ? firstHalf.reduce((a, b) => a + b) / firstHalf.length : 0;
     const secondAvg = secondHalf.length > 0 ? secondHalf.reduce((a, b) => a + b) / secondHalf.length : 0;
 
@@ -429,7 +429,7 @@ function handleUserLegitimacyClaim(message = '', currentConfidence = 0) {
     // User claims legitimacy - reduce confidence slightly but maintain safety threshold
     // Never go below 30% if scam was detected (realism without naivety)
     let adjustedConfidence = currentConfidence * 0.75; // 25% reduction
-    
+
     if (currentConfidence > 0.15) {
         adjustedConfidence = Math.max(adjustedConfidence, 0.3); // Minimum 30% for detected scams
     }
@@ -485,6 +485,51 @@ function getPhaseBasedBehavior(phase = 'early') {
     return behaviors[phase] || behaviors['early'];
 }
 
+/**
+ * Identify Target Asset
+ * What is the scammer trying to steal?
+ * @param {string} message - The analyzed message
+ * @returns {string} - The target asset (OTP, UPI_PAYMENT, etc.)
+ */
+function identifyTargetAsset(message = '') {
+    const msg = message.toLowerCase();
+
+    // 1. High Priority: Direct Financial/Security Credentials
+    if (/otp|one.*time.*password|pin|cvv|passcode|secret.*code/i.test(msg)) {
+        return 'OTP';
+    }
+    if (/upi|vpa|gpay|phonepe|paytm|bhim/i.test(msg)) {
+        return 'UPI_PAYMENT';
+    }
+    if (/password|login|credentials|user.*id/i.test(msg)) {
+        return 'PASSWORD';
+    }
+    if (/credit.*card|debit.*card|card.*number|expiry|valid.*thru/i.test(msg)) {
+        return 'CREDIT_CARD';
+    }
+
+    // 2. Medium Priority: Account & Money
+    if (/bank.*account|account.*number|ifsc|beneficiary/i.test(msg)) {
+        return 'BANK_ACCOUNT';
+    }
+    if (/qr.*code|scan.*code/i.test(msg)) {
+        return 'QR_CODE';
+    }
+    if (/money|amount|cash|transfer|payment|fund/i.test(msg)) {
+        return 'MONEY';
+    }
+
+    // 3. Low Priority: Device & Info
+    if (/app|apk|software|install|download|team.*viewer|any.*desk/i.test(msg)) {
+        return 'DEVICE_ACCESS';
+    }
+    if (/aadhaar|pan|id.*proof|kyc|document/i.test(msg)) {
+        return 'PERSONAL_INFO';
+    }
+
+    return null; // No specific asset identified
+}
+
 module.exports = {
     generateReasoningLayer,
     generateSafetyAdvice,
@@ -493,5 +538,6 @@ module.exports = {
     classifyScamArchetype,
     applyConfidenceDecayProtection,
     handleUserLegitimacyClaim,
-    getPhaseBasedBehavior
+    getPhaseBasedBehavior,
+    identifyTargetAsset
 };

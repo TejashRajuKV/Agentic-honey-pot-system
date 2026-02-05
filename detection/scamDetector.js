@@ -8,7 +8,8 @@ const {
     detectUserVulnerability,
     classifyScamArchetype,
     applyConfidenceDecayProtection,
-    handleUserLegitimacyClaim
+    handleUserLegitimacyClaim,
+    identifyTargetAsset
 } = require('./scamAnalysisEngine');
 
 /**
@@ -22,7 +23,9 @@ const {
  * 5️⃣ User Vulnerability Detection (Victim assessment)
  * 6️⃣ Scam Archetype Label (Classification)
  * 7️⃣ Confidence Decay Protection (Lock confidence)
+ * 7️⃣ Confidence Decay Protection (Lock confidence)
  * 8️⃣ User Override Handling (Claims of legitimacy)
+ * 9️⃣ Target Asset Identification (OTP, UPI, etc.)
  */
 
 /**
@@ -47,8 +50,10 @@ async function detectScamIntent(message, conversationHistory = [], sessionData =
             pressureVelocity: { velocity: 'slow', score: 0 },
             userVulnerability: { vulnerability: 'low', indicators: [], score: 0 },
             scamType: 'UNKNOWN_SCAM',
+            scamType: 'UNKNOWN_SCAM',
             confidenceLocked: false,
-            userClaimedLegitimate: false
+            userClaimedLegitimate: false,
+            targetAsset: null
         };
     }
 
@@ -87,6 +92,9 @@ async function detectScamIntent(message, conversationHistory = [], sessionData =
     // Feature 6️⃣: Classify scam archetype
     const scamType = classifyScamArchetype(message, baseResult.detectedPatterns, baseResult.categories);
 
+    // Feature 9️⃣: Identify target asset
+    const targetAsset = identifyTargetAsset(message);
+
     // Feature 8️⃣: Check for user claims of legitimacy (before decay protection)
     const legitimacyCheck = handleUserLegitimacyClaim(message, baseResult.confidence);
     const userClaimedLegitimate = legitimacyCheck.userClaimedLegitimate;
@@ -118,7 +126,8 @@ async function detectScamIntent(message, conversationHistory = [], sessionData =
         userVulnerability,              // 5️⃣ Victim vulnerability
         scamType,                       // 6️⃣ Archetype label
         confidenceLocked,               // 7️⃣ Confidence locked flag
-        userClaimedLegitimate           // 8️⃣ User override claim
+        userClaimedLegitimate,          // 8️⃣ User override claim
+        targetAsset                     // 9️⃣ Target asset
     };
 }
 

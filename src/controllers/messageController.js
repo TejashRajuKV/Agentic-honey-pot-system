@@ -440,7 +440,9 @@ exports.handleIncomingMessage = async (req, res) => {
             // 7️⃣ Confidence Decay Protection
             confidenceLocked: scamDetection.confidenceLocked || false,
             // 8️⃣ User Override / Feedback
-            userClaimedLegitimate: scamDetection.userClaimedLegitimate || false
+            userClaimedLegitimate: scamDetection.userClaimedLegitimate || false,
+            // 9️⃣ Target Asset Identification
+            targetAsset: scamDetection.targetAsset || null
         };
 
         return res.json(response);
