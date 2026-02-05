@@ -30,7 +30,15 @@ function sanitizeText(text) {
     if (!text || typeof text !== 'string') return '';
 
     // Remove potentially dangerous characters but preserve the content
-    return text.trim().substring(0, 5000); // Limit length
+    const cleanText = text.trim().substring(0, 5000); // Limit length
+
+    // Basic HTML escaping to prevent XSS
+    return cleanText
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 /**

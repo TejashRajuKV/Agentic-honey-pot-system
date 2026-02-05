@@ -6,7 +6,7 @@
  */
 
 const API_URL = "http://localhost:3000/api/v1/messages";
-const API_KEY = "honeypot_secret_key_2026";
+const API_KEY = process.env.API_KEY || "honeypot_secret_key_2026";
 
 // 70+ Advanced Edge-Case Scenarios (20 tests with 3-4 variations each)
 const edgeCaseScenarios = [
