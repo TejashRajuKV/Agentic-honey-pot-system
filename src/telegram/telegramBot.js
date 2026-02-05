@@ -122,7 +122,7 @@ Let's begin! Send me a message...
         // Archive old session
         const oldSession = await Session.findOne({ sessionId });
         if (oldSession) {
-            oldSession.status = 'completed';
+            oldSession.status = 'terminated';
             await oldSession.save();
         }
 
@@ -228,14 +228,15 @@ Use /report for detailed analysis!
             let detectionDetails = null;
 
             if (lastUserTurn) {
-                detectionDetails = await scamDetector.analyzeMessage(lastUserTurn.text, {
-                    sessionId,
-                    conversationHistory: turns.slice(0, -1).map(t => ({
+                detectionDetails = await scamDetector.detectScamIntent(
+                    lastUserTurn.text,
+                    turns.slice(0, -1).map(t => ({
                         role: t.role,
                         text: t.text,
                         timestamp: t.timestamp
-                    }))
-                });
+                    })),
+                    { sessionId }
+                );
             }
 
             // Build report
@@ -249,7 +250,7 @@ Use /report for detailed analysis!
             report += `Phase: ${session.highestPhase}\n\n`;
 
             // Scam Type & Reasoning
-            if (detectionDetails && detectionDetails.scamDetected) {
+            if (detectionDetails && detectionDetails.isScam) {
                 report += `*🎯 SCAM CLASSIFICATION*\n`;
                 report += `Type: ${detectionDetails.scamType || 'UNKNOWN'}\n`;
 
@@ -349,61 +350,70 @@ Use /report for detailed analysis!
             }));
 
             // Detect scam
-            const detection = await scamDetector.analyzeMessage(text, {
-                sessionId,
+            const detection = await scamDetector.detectScamIntent(
+                text,
                 conversationHistory,
-                platform: 'telegram'
-            });
+                { sessionId, platform: 'telegram' }
+            );
 
             // Generate agent response
-            const response = await agentService.generateResponse(text, {
-                sessionId,
+            const response = await agentService.generateAgentResponse(
+                text,
                 conversationHistory,
-                detection,
-                platform: 'telegram'
-            });
+                {
+                    scamDetected: detection.isScam,
+                    scamProbability: detection.confidence * 100,
+                    scamType: detection.scamType,
+                    detectedPatterns: detection.detectedPatterns
+                },
+                { sessionId, platform: 'telegram' }
+            );
 
             // Save user message
+            const userTurnCount = previousTurns.filter(t => t.role === 'user').length;
             await ConversationTurn.create({
                 sessionId,
+                turnIndex: userTurnCount * 2,
                 role: 'user',
                 text: text,
                 timestamp: new Date(),
-                metadata: {
-                    scamProbability: detection.scamProbability,
-                    phase: detection.phase,
-                    detectedPatterns: detection.detectedPatterns,
-                    telegramMessageId: msg.message_id
+                detectedScamIntent: detection.isScam,
+                extractedIntel: {
+                    upiIds: detection.detectedPatterns?.filter(p => p.includes('upi')) || [],
+                    phoneNumbers: [],
+                    urls: [],
+                    scamPhrases: detection.detectedPatterns || [],
+                    behavioralPatterns: []
                 }
             });
 
             // Save agent response
             await ConversationTurn.create({
                 sessionId,
-                role: 'assistant',
-                text: response.text || response.reply,
+                turnIndex: userTurnCount * 2 + 1,
+                role: 'agent',
+                text: response.response || 'Sorry, I could not generate a response.',
                 timestamp: new Date(),
-                metadata: {
-                    emotion: response.emotion,
-                    baitType: response.baitType
-                }
+                detectedScamIntent: false,
+                extractedIntel: {}
             });
 
             // Update session
-            session.maxScamProbability = Math.max(session.maxScamProbability, detection.scamProbability);
-            session.scamEverDetected = session.scamEverDetected || detection.scamDetected;
-            session.highestPhase = this.getHigherPhase(session.highestPhase, detection.phase);
+            const scamProbability = detection.confidence * 100;
+            session.maxScamProbability = Math.max(session.maxScamProbability, scamProbability);
+            session.scamEverDetected = session.scamEverDetected || detection.isScam;
+            session.highestPhase = this.getHigherPhase(session.highestPhase, detection.riskLevel === 'CRITICAL' ? 'final' : detection.riskLevel === 'HIGH' ? 'late' : detection.riskLevel === 'MEDIUM' ? 'mid' : 'early');
             session.lastActiveAt = new Date();
             await session.save();
 
             // Send response to user
-            await this.bot.sendMessage(chatId, response.text || response.reply);
+            await this.bot.sendMessage(chatId, response.response || 'Sorry, I could not generate a response.');
 
             // Send detection alert if high risk
-            if (detection.scamProbability >= 70 && previousTurns.length >= 3) {
+            if (scamProbability >= 70 && previousTurns.length >= 3) {
                 const alertMsg = `
 ⚠️ *Scam Detection Alert*
-Probability: ${detection.scamProbability}%
+Probability: ${Math.round(scamProbability)}%
 Type: ${detection.scamType || 'Unknown'}
 
 Use /stats or /report for details!
@@ -423,17 +433,23 @@ Use /stats or /report for details!
      * Create new session
      */
     async createSession(sessionId, chatId) {
-        const session = await Session.create({
-            sessionId,
-            platform: 'telegram',
-            status: 'active',
-            scamEverDetected: false,
-            maxScamProbability: 0,
-            highestPhase: 'early',
-            metadata: {
-                telegramChatId: chatId
-            }
-        });
+        const session = await Session.findOneAndUpdate(
+            { sessionId },
+            {
+                $setOnInsert: {
+                    sessionId,
+                    platform: 'telegram',
+                    status: 'active',
+                    scamEverDetected: false,
+                    maxScamProbability: 0,
+                    highestPhase: 'early',
+                    metadata: {
+                        telegramChatId: chatId
+                    }
+                }
+            },
+            { upsert: true, new: true }
+        );
 
         this.activeSessions.set(chatId, {
             sessionId,
