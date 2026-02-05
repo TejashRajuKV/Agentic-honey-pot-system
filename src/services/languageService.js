@@ -236,6 +236,11 @@ class LanguageService {
         const detection = this.detectLanguage(text);
         const enhanced = { ...baseDetection };
 
+        // Initialize scamProbability if missing (convert from confidence 0-1 to 0-100)
+        if (enhanced.scamProbability === undefined && enhanced.confidence !== undefined) {
+            enhanced.scamProbability = enhanced.confidence * 100;
+        }
+
         // Add language context
         enhanced.language = detection.language;
         enhanced.languageConfidence = detection.confidence;
@@ -262,6 +267,9 @@ class LanguageService {
 
         // Cap probability at 100
         enhanced.scamProbability = Math.min(enhanced.scamProbability || 0, 100);
+
+        // Sync back to confidence (0-1)
+        enhanced.confidence = enhanced.scamProbability / 100;
 
         return enhanced;
     }

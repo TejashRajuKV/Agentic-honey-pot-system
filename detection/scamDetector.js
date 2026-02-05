@@ -57,8 +57,8 @@ async function detectScamIntent(message, conversationHistory = [], sessionData =
 
     // FEATURE ADDITION: Language Service Integration
     // Enhance detection with language-specific analysis (e.g., Hinglish scams)
-    const { enhanceDetectionWithLanguage } = require('../src/services/languageService');
-    baseResult = enhanceDetectionWithLanguage(message, baseResult);
+    const languageService = require('../src/services/languageService');
+    baseResult = languageService.enhanceDetectionWithLanguage(message, baseResult);
 
     // Feature 1️⃣: Generate reasoning layer (WHY it's a scam)
     const reasoning = generateReasoningLayer(
