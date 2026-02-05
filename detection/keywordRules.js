@@ -103,6 +103,28 @@ const SCAM_PATTERNS = {
         /don'?t.*worry/i,
         /no.*need.*to.*worry/i,
         /relax.*i.*help/i,
+        /family.*support/i,
+        /please.*brother/i,
+    ],
+
+    // Money transfer requests - CRITICAL SCAM PATTERN
+    moneyRequests: [
+        /transfer.*(money|amount|rupee|cash|fund)/i,
+        /send.*(money|amount|rupee|cash|fund)/i,
+        /pay.*(money|amount|rupee|cash)/i,
+        /₹\s*\d+/i,                              // ₹500, ₹ 1000
+        /rs\.?\s*\d+/i,                          // Rs 500, Rs. 1000
+        /rupee/i,
+        /\d+\s*rupee/i,                          // 1000 rupees
+        /emergency.*(money|fund|help|transfer)/i,
+        /urgent.*(money|fund|transfer|payment)/i,
+        /need.*(money|cash|fund)/i,
+        /borrow.*(money|cash)/i,
+        /lend.*(money|cash)/i,
+        /advance.*(amount|money)/i,
+        /payment.*urgent/i,
+        /transfer.*now/i,
+        /send.*now/i,
     ],
 
     // Authority validation - References and legal threats

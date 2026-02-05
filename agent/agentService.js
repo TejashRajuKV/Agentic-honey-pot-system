@@ -5,6 +5,7 @@ const { getConversationPhase, updateAgentState, AGENT_STATES } = require('./agen
 const { generateRuleBasedResponse, generateEmotionAwareResponse } = require('./conversationHandler');
 const { shouldUseBait, generateBaitResponse, analyzeBaitResponse } = require('./baitStrategy');
 const { governResponse, RESPONSE_MODES } = require('./responseGovernor');
+const { getPhaseBasedBehavior } = require('../detection/scamAnalysisEngine');
 
 // Gemini AI integration (disabled by default)
 let geminiModel = null;
@@ -45,6 +46,14 @@ async function generateAgentResponse(userMessage, conversationHistory = [], scam
     // Determine the conversation context and phase
     const turnCount = conversationHistory.length;
     const phase = getConversationPhase(turnCount);
+
+    // 3️⃣ CONVERSATION PHASE & BEHAVIOR
+    // Phase is used for non-critical tone; Governor handles critical safety
+    console.log(`[AgentService] Engagement Phase: ${phase}`);
+
+    // We REMOVED the hardcoded freeze here because it's now handled by the 
+    // Response Governor + Agent State Machine for more granular control.
+
 
     // LEVEL 5: Check if we should use bait strategy
     const useBait = shouldUseBait({ confidence, riskLevel }, phase, turnCount);
@@ -134,7 +143,8 @@ async function generateAgentResponse(userMessage, conversationHistory = [], scam
         fsmScenario,
         userMessage,
         aggressionDetected,
-        repetitionCount
+        repetitionCount,
+        safetyAdvice: scamContext.safetyAdvice || []
     });
 
     // Log governor action if it overrode the response

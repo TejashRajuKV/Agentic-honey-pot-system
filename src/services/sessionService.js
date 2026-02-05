@@ -95,17 +95,32 @@ async function saveConversationTurn(sessionId, role, text, intel = {}, scamInten
 }
 
 /**
- * Determine engagement phase based on conversation history
+ * Determine engagement phase based on conversation history and session state
+ * Ensures monotonicity: early → mid → late → final
  * @param {string} sessionId - Session identifier
  * @returns {string} - Engagement phase: 'early', 'mid', 'late', or 'final'
  */
 async function determineEngagementPhase(sessionId) {
+    const session = await Session.findOne({ sessionId });
     const turnCount = await ConversationTurn.countDocuments({ sessionId });
 
-    if (turnCount <= 2) return "early";
-    if (turnCount <= 5) return "mid";
-    if (turnCount <= 8) return "late";
-    return "final";
+    const PHASE_ORDER = { 'early': 0, 'mid': 1, 'late': 2, 'final': 3 };
+    const ORDER_TO_PHASE = ['early', 'mid', 'late', 'final'];
+
+    // Phase based on turns
+    let turnPhase = "early";
+    if (turnCount > 8) turnPhase = "final";
+    else if (turnCount > 5) turnPhase = "late";
+    else if (turnCount > 2) turnPhase = "mid";
+
+    // Phase from session (risk-based)
+    const storedPhase = session?.highestPhase || 'early';
+
+    // Return the higher of the two
+    const turnOrder = PHASE_ORDER[turnPhase];
+    const storedOrder = PHASE_ORDER[storedPhase];
+
+    return turnOrder > storedOrder ? turnPhase : storedPhase;
 }
 
 /**

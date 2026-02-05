@@ -44,27 +44,9 @@ async function sendMessage(userMessage) {
         const data = await response.json();
 
         console.log('\n' + '─'.repeat(60));
-        console.log(`🤖 Agent: ${data.reply}`);
+        console.log('📦 Raw JSON Response:');
+        console.log(JSON.stringify(data, null, 2));
         console.log('─'.repeat(60));
-
-        if (data.isScam) {
-            console.log(`\n⚠️  Scam Detected! Confidence: ${(data.confidence * 100).toFixed(0)}%`);
-            console.log(`   Phase: ${data.engagementPhase} | Status: ${data.status}`);
-        }
-
-        if (data.debug) {
-            console.log(`\n🔍 Categories: ${data.debug.detectedCategories.join(', ') || 'none'}`);
-            if (data.debug.extractedIntel.upiIds.length > 0) {
-                console.log(`   💳 UPI IDs: ${data.debug.extractedIntel.upiIds.join(', ')}`);
-            }
-            if (data.debug.extractedIntel.phoneNumbers.length > 0) {
-                console.log(`   📱 Phone: ${data.debug.extractedIntel.phoneNumbers.join(', ')}`);
-            }
-            if (data.debug.extractedIntel.urls.length > 0) {
-                console.log(`   🔗 URLs: ${data.debug.extractedIntel.urls.join(', ')}`);
-            }
-        }
-
         console.log('');
 
     } catch (error) {

@@ -90,6 +90,21 @@ async function testNewFormat() {
     console.log("\nResponse 2:");
     console.log(JSON.stringify(response2, null, 2));
 
+    // Summary display
+    console.log("\n" + "═".repeat(60));
+    console.log("📊 SCAM DETECTION SUMMARY");
+    console.log("═".repeat(60));
+
+    console.log("\n📩 Message 1: \"" + firstRequest.message.text + "\"");
+    console.log(`   Scam Detected: ${response1.scamDetected ? '✅ YES' : '❌ NO'} (${response1.scamProbability}%)`);
+    console.log(`   Phase: ${response1.phase}`);
+    console.log(`   Patterns: ${response1.patterns?.join(', ') || 'none'}`);
+
+    console.log("\n📩 Message 2: \"" + secondRequest.message.text + "\"");
+    console.log(`   Scam Detected: ${response2.scamDetected ? '✅ YES' : '❌ NO'} (${response2.scamProbability}%)`);
+    console.log(`   Phase: ${response2.phase}`);
+    console.log(`   Patterns: ${response2.patterns?.join(', ') || 'none'}`);
+
     console.log("\n✅ New format test complete!");
 }
 

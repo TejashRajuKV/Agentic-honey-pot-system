@@ -22,12 +22,14 @@ const STATE_HIERARCHY = {
 };
 
 const NON_NEGOTIABLE_TRIGGERS = [
-    { pattern: /click.*link|visit.*url/i, state: AGENT_STATES.HIGH_RISK, scenario: 'link_request' },
-    { pattern: /won.*prize|reward.*5000|lottery/i, state: AGENT_STATES.HIGH_RISK, scenario: 'reward' },
-    { pattern: /otp.*request|send.*code|tell.*otp/i, state: AGENT_STATES.CONFIRMED_SCAM, scenario: 'otp_request' },
-    { pattern: /payment.*request|send.*money|transfer.*amount/i, state: AGENT_STATES.CONFIRMED_SCAM, scenario: 'payment_request' },
-    { pattern: /threat|legal.*action|police|arrest/i, state: AGENT_STATES.HIGH_RISK, scenario: 'threat' },
-    { pattern: /stupid|idiot|waste.*time|useless/i, state: AGENT_STATES.TERMINATED, scenario: 'abuse' }
+    { pattern: /click.*link|visit.*url|bit\.ly|t\.co/i, state: AGENT_STATES.HIGH_RISK, scenario: 'link_request' },
+    { pattern: /won.*prize|reward.*5000|lottery|winner|crore|lakh/i, state: AGENT_STATES.HIGH_RISK, scenario: 'reward' },
+    { pattern: /otp.*request|send.*code|tell.*otp|verification.*code/i, state: AGENT_STATES.CONFIRMED_SCAM, scenario: 'otp_request' },
+    { pattern: /payment.*request|send.*money|transfer.*amount|pay.*₹|upi.*id/i, state: AGENT_STATES.CONFIRMED_SCAM, scenario: 'payment_request' },
+    { pattern: /threat|legal.*action|police|arrest|court|jail|case/i, state: AGENT_STATES.HIGH_RISK, scenario: 'threat' },
+    { pattern: /blocked|frozen|suspended|deactivated|within.*minutes|immediately|urgent|now|deadline/i, state: AGENT_STATES.HIGH_RISK, scenario: 'urgency_threat' },
+    { pattern: /bank|rbi|income.*tax|cbi|police.*department/i, state: AGENT_STATES.SUSPICIOUS, scenario: 'authority_claim' },
+    { pattern: /stupid|idiot|waste.*time|useless|abuse/i, state: AGENT_STATES.TERMINATED, scenario: 'abuse' }
 ];
 
 /**
@@ -52,7 +54,7 @@ function updateAgentState(currentMessage, detectionResults, currentState = AGENT
         nextState = AGENT_STATES.CONFIRMED_SCAM;
     } else if (confidence > 0.4 && STATE_HIERARCHY[AGENT_STATES.HIGH_RISK] > STATE_HIERARCHY[nextState]) {
         nextState = AGENT_STATES.HIGH_RISK;
-    } else if (confidence > 0.15 && STATE_HIERARCHY[AGENT_STATES.SUSPICIOUS] > STATE_HIERARCHY[nextState]) {
+    } else if (confidence > 0.20 && STATE_HIERARCHY[AGENT_STATES.SUSPICIOUS] > STATE_HIERARCHY[nextState]) {
         nextState = AGENT_STATES.SUSPICIOUS;
     }
 
@@ -104,23 +106,23 @@ function getEngagementStrategy(phase, categories) {
         },
         mid: {
             banking: 'express_worry',
-            phishing: 'show_excitement',
+            phishing: 'show_hesitation',
             fakeOffers: 'request_details',
-            default: 'seek_understanding'
+            default: 'hesitate_and_verify'
         },
         late: {
-            banking: 'prepare_comply',
-            phishing: 'ready_to_claim',
-            fakeOffers: 'eager_to_proceed',
-            default: 'willing_to_act'
+            banking: 'refuse_clearly',
+            phishing: 'refuse_clearly',
+            fakeOffers: 'refuse_clearly',
+            default: 'refuse_clearly'
         },
         final: {
-            default: 'extract_final_details'
+            default: 'provide_safety_advice'
         }
     };
 
     const category = categories[0] || 'default';
-    return strategies[phase]?.[category] || strategies[phase]?.default || 'neutral';
+    return strategies[phase]?.[category] || strategies[phase]?.default || 'refuse_clearly';
 }
 
 module.exports = {

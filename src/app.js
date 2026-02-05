@@ -24,8 +24,26 @@ app.get("/", (req, res) => {
     res.json({ message: "Agentic Honey-Pot Backend is running 🐝" });
 });
 
+// Serve static files from public directory (dashboard)
+app.use(express.static('public'));
+
 // API Routes
 const messageRoutes = require("./routes/messageRoutes");
+const analyticsRoutes = require("./routes/analytics");
+const intelligenceRoutes = require("./routes/intelligence");
+const profilerRoutes = require("./routes/profiler");
+const alertsRoutes = require("./routes/alerts");
+const qualityRoutes = require("./routes/quality");
+const reportsRoutes = require("./routes/reports");
+const languageRoutes = require("./routes/language");
+
 app.use("/api/v1", messageRoutes);
+app.use("/api/v1/analytics", analyticsRoutes);
+app.use("/api/v1/intelligence", intelligenceRoutes);
+app.use("/api/v1/profiles", profilerRoutes);
+app.use("/api/v1/alerts", alertsRoutes);
+app.use("/api/v1/quality", qualityRoutes);
+app.use("/api/v1/reports", reportsRoutes);
+app.use("/api/v1/language", languageRoutes);
 
 module.exports = app;

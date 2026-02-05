@@ -307,12 +307,12 @@ function generateRuleBasedResponse(userMessage, phase, categories = [], conversa
             return "You keep saying urgent. That's making me more nervous. Please explain slowly.";
         }
 
-        // DEFAULT - General confusion
+        // DEFAULT - General confusion / Cautious Neutral
         return pickRandom([
-            "I just got your message. Can you explain this more clearly from the beginning?",
-            "I'm trying to understand. What exactly do you need from me?",
-            "This is important right? I want to make sure I do everything correctly.",
-            "Sorry, I'm a bit confused. Can you tell me what this is about?"
+            "I'm not sure I understand. Can you explain this more clearly from the beginning?",
+            "I'm trying to follow. What exactly is the reason for this message?",
+            "I see. I want to make sure I do everything correctly if this is important.",
+            "Sorry, I'm a bit confused. Can you tell me what this is about exactly?"
         ]);
     }
 
@@ -431,7 +431,12 @@ function generateRuleBasedResponse(userMessage, phase, categories = [], conversa
             ]);
         }
 
-        return "I understand your situation, but I still don't see why this involves my account. Can you explain?";
+        return pickRandom([
+            "I'm really worried about this. Are you sure this is the right way?",
+            "Something about this doesn't feel right. I'm hesitant to do anything without being sure.",
+            "I'm getting more concerned now. Can you prove this is official?",
+            "This is making me very nervous. I need to be careful with my account."
+        ]);
     }
 
     // LEVEL 3 & 4: Delay + Information Extraction - Context-aware friction

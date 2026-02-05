@@ -15,6 +15,9 @@ const {
 const { sendFinalCallback, formatIntelligenceReport } = require("../../agent/callbackService");
 const { sanitizeText, calculateDuration } = require("../utils/helpers");
 
+// Session model for Risk Accumulation Engine
+const Session = require("../models/Session");
+
 // New advanced features
 const { checkKnownScammer, updateScammerIntelligence } = require("../services/crossSessionIntelligence");
 const { selectPersona, applyPersona } = require("../../agent/personaSystem");
@@ -52,11 +55,95 @@ exports.handleIncomingMessage = async (req, res) => {
             message = { text: message, sender: 'scammer', timestamp: Date.now() };
         }
 
+        // ========================================================================
+        // RISK ACCUMULATION ENGINE - CRITICAL FOR HACKATHON
+        // Once scam is detected, it NEVER becomes false
+        // Probability can ONLY increase, never decrease
+        // Phase can ONLY progress forward: early → mid → late → final
+        // ========================================================================
+
+        const PHASE_ORDER = { 'early': 0, 'mid': 1, 'late': 2, 'final': 3 };
+
+        // Helper to get higher phase (monotonic progression)
+        const getHigherPhase = (current, newPhase) => {
+            const currentOrder = PHASE_ORDER[current] || 0;
+            const newOrder = PHASE_ORDER[newPhase] || 0;
+            return newOrder > currentOrder ? newPhase : current;
+        };
+
+        // Helper to calculate current phase from detection
+        const calculatePhase = (detection, scamProbability, sessionState) => {
+            // Check session termination states first
+            if (sessionState.status === 'terminated' || sessionState.fsmState === 'TERMINATED') {
+                return 'final';
+            }
+            if (detection.riskLevel === 'CRITICAL' || scamProbability >= 90) {
+                return 'late';
+            }
+            if (detection.riskLevel === 'HIGH' || scamProbability >= 70) {
+                return 'late';
+            }
+            if (detection.riskLevel === 'MEDIUM' || scamProbability >= 40) {
+                return 'mid';
+            }
+            if (detection.isScam) {
+                return 'mid'; // Any detected scam is at least 'mid'
+            }
+            return 'early';
+        };
+
+        // RISK ACCUMULATION: Apply monotonic state updates
+        const applyRiskAccumulation = (detection = {}, session = {}) => {
+            // Get current detection values
+            const currentScamDetected = Boolean(detection.isScam);
+            const rawProbability = Number.isFinite(detection.confidence)
+                ? Math.round(detection.confidence * 100)
+                : 0;
+            const currentProbability = currentScamDetected ? Math.max(rawProbability, 30) : rawProbability;
+            const currentPhase = calculatePhase(detection, currentProbability, session);
+
+            // Get accumulated state from session (defaults if not present)
+            const accumulatedScam = Boolean(session.scamEverDetected);
+            const accumulatedProbability = Number(session.maxScamProbability) || 0;
+            const accumulatedPhase = session.highestPhase || 'early';
+
+            // APPLY MONOTONIC RULES:
+            // 1. Once true, ALWAYS true
+            const finalScamDetected = accumulatedScam || currentScamDetected;
+
+            // 2. Probability can ONLY increase
+            const finalProbability = Math.max(accumulatedProbability, currentProbability);
+
+            // 3. Phase can ONLY progress forward
+            const finalPhase = getHigherPhase(accumulatedPhase, currentPhase);
+
+            // Return the accumulated result
+            return {
+                scamDetected: finalScamDetected,
+                scamProbability: finalProbability,
+                phase: finalPhase,
+                patterns: Array.isArray(detection.detectedPatterns)
+                    ? detection.detectedPatterns
+                    : [],
+                // Return values to save back to session
+                _sessionUpdates: {
+                    scamEverDetected: finalScamDetected,
+                    maxScamProbability: finalProbability,
+                    highestPhase: finalPhase
+                }
+            };
+        };
+
         // If no message at all (empty body from GUVI tester), return valid response
         if (!message || (typeof message === 'object' && !message.text)) {
+            const defaults = applyRiskAccumulation({}, {});
             return res.json({
                 status: "success",
-                reply: "Hello. Please tell me more details."
+                reply: "Hello. Please tell me more details.",
+                scamDetected: defaults.scamDetected,
+                scamProbability: defaults.scamProbability,
+                phase: defaults.phase,
+                patterns: defaults.patterns
             });
         }
 
@@ -123,7 +210,11 @@ exports.handleIncomingMessage = async (req, res) => {
         console.log(`😊 Emotion detected: ${emotion} (intensity: ${intensity.toFixed(2)})`);
 
         // Detect scam intent with conversation context
-        const scamDetection = await detectScamIntent(sanitizedMessage, history);
+        // Pass session data for confidence decay protection
+        const scamDetection = await detectScamIntent(sanitizedMessage, history, {
+            previousConfidence: session.maxScamProbability ? session.maxScamProbability / 100 : 0,
+            confidenceLocked: session.confidenceLocked || false
+        });
 
 
         // Extract intelligence from the message
@@ -304,10 +395,52 @@ exports.handleIncomingMessage = async (req, res) => {
             }
         }
 
-        // Prepare response - simplified format for evaluation platform
+        // Prepare response - include ALL required scam detection fields for GUVI tester
+        // Use current session for risk accumulation (read accumulated values)
+        const currentSession = await Session.findOne({ sessionId }) || {};
+        const safeResult = applyRiskAccumulation(scamDetection, currentSession);
+
+        // CRITICAL: Save accumulated state back to session (monotonic values)
+        if (safeResult._sessionUpdates) {
+            await Session.updateOne(
+                { sessionId },
+                {
+                    $set: {
+                        scamEverDetected: safeResult._sessionUpdates.scamEverDetected,
+                        maxScamProbability: safeResult._sessionUpdates.maxScamProbability,
+                        highestPhase: safeResult._sessionUpdates.highestPhase,
+                        confidenceLocked: scamDetection.confidenceLocked || false,
+                        userVulnerability: scamDetection.userVulnerability?.vulnerability || 'low',
+                        scamType: scamDetection.scamType || 'UNKNOWN_SCAM'
+                    }
+                },
+                { upsert: true }
+            );
+        }
+
+        // Build enhanced response with all 8 new features
         const response = {
             status: "success",
-            reply: agentReply
+            reply: agentReply,
+            scamDetected: safeResult.scamDetected,
+            scamProbability: safeResult.scamProbability,
+            phase: safeResult.phase,
+            patterns: safeResult.patterns,
+            // ========== NEW FEATURES ==========
+            // 1️⃣ Risk Explanation Layer
+            reasoning: scamDetection.reasoning || [],
+            // 2️⃣ User Safety Guidance
+            safetyAdvice: scamDetection.safetyAdvice || [],
+            // 4️⃣ Pressure Velocity Score
+            pressureVelocity: scamDetection.pressureVelocity?.velocity || 'slow',
+            // 5️⃣ User Vulnerability Detection
+            userVulnerability: scamDetection.userVulnerability?.vulnerability || 'low',
+            // 6️⃣ Scam Archetype Label
+            scamType: scamDetection.scamType || 'UNKNOWN_SCAM',
+            // 7️⃣ Confidence Decay Protection
+            confidenceLocked: scamDetection.confidenceLocked || false,
+            // 8️⃣ User Override / Feedback
+            userClaimedLegitimate: scamDetection.userClaimedLegitimate || false
         };
 
         return res.json(response);

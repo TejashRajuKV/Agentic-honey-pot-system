@@ -271,7 +271,8 @@ function governResponse(confidence, proposedResponse, options = {}) {
         fsmScenario = null,
         aggressionDetected = false,
         repetitionCount = 0,
-        userMessage = ''
+        userMessage = '',
+        safetyAdvice = []
     } = options;
 
     const hasAggression = aggressionDetected || detectAggression(userMessage);
@@ -281,7 +282,7 @@ function governResponse(confidence, proposedResponse, options = {}) {
     let overridden = false;
     let guardrailTriggered = null;
 
-    console.log(`[Governor] State: ${fsmState}, Scenario: ${fsmScenario}`);
+    console.log(`[Governor] State: ${fsmState}, Scenario: ${fsmScenario}, Mode: ${mode}`);
 
     // RULE: Response Locking for HIGH_RISK and above
     if (fsmState === 'TERMINATED') {
@@ -299,8 +300,11 @@ function governResponse(confidence, proposedResponse, options = {}) {
         response = lib[fsmScenario] || lib['default'];
         overridden = true;
         guardrailTriggered = 'STATE_HIGH_RISK';
+    } else if (mode === RESPONSE_MODES.BLOCKING) {
+        response = pickRandomTemplate(BLOCKING_TEMPLATES);
+        overridden = true;
+        guardrailTriggered = 'MODE_BLOCKING';
     } else if (mode === RESPONSE_MODES.DEFENSIVE) {
-
         response = pickRandomTemplate(DEFENSIVE_TEMPLATES);
         overridden = true;
         guardrailTriggered = 'MODE_DEFENSIVE';
@@ -309,11 +313,21 @@ function governResponse(confidence, proposedResponse, options = {}) {
         overridden = false;
     }
 
-    // FINAL SAFETY CHECK: NO QUESTIONS in HIGH_RISK or higher
-    if (['HIGH_RISK', 'CONFIRMED_SCAM', 'TERMINATED'].includes(fsmState)) {
+    // FINAL SAFETY CHECK: NO QUESTIONS in HIGH_RISK or higher, or BLOCKING/TERMINATE mode
+    if (['HIGH_RISK', 'CONFIRMED_SCAM', 'TERMINATED'].includes(fsmState) || [RESPONSE_MODES.BLOCKING, RESPONSE_MODES.TERMINATE].includes(mode)) {
         if (response.includes('?')) {
-            response = response.split('?')[0] + '.';
-            guardrailTriggered = (guardrailTriggered || '') + '_FORCED_NO_QUESTION';
+            response = response.split('?')[0].trim() + '.';
+            guardrailTriggered = (guardrailTriggered || 'UNSAFE_PROPOSED_RESPONSE') + '_FORCED_NO_QUESTION';
+        }
+    }
+
+    // APPEND SAFETY ADVICE if in high risk or confirmed scam
+    if ((['HIGH_RISK', 'CONFIRMED_SCAM'].includes(fsmState) || mode === RESPONSE_MODES.BLOCKING) && safetyAdvice.length > 0) {
+        const adviceStr = " For your safety: " + safetyAdvice.slice(0, 2).join("; ");
+        // Avoid double-appending if the response already contains similar advice
+        if (!response.toLowerCase().includes("safety") && !response.toLowerCase().includes("official")) {
+            response += adviceStr;
+            guardrailTriggered = (guardrailTriggered || '') + '_ADVICE_APPENDED';
         }
     }
 

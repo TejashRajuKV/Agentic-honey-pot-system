@@ -32,22 +32,32 @@ function advancedScamDetection(message, conversationHistory = []) {
     // Layer 5: Urgency & Pressure Tactics
     const urgencyScore = analyzeUrgency(msg);
 
-    // Weighted scoring system
+    // Weighted scoring system - higher weights for direct pattern detection
     const weights = {
-        pattern: 0.35,
+        pattern: 0.40,
         behavior: 0.20,
-        context: 0.20,
-        intelligence: 0.15,
-        urgency: 0.10
+        context: 0.25,
+        intelligence: 0.10,
+        urgency: 0.05
     };
 
-    const totalScore = (
+    let totalScore = (
         patternScore.score * weights.pattern +
         behaviorScore.score * weights.behavior +
         contextScore.score * weights.context +
         intelScore.score * weights.intelligence +
         urgencyScore.score * weights.urgency
     );
+
+    // BOOST: If ANY layer detected something significant, boost overall score
+    const layerScores = [patternScore.score, behaviorScore.score, contextScore.score, intelScore.score, urgencyScore.score];
+    const significantLayers = layerScores.filter(s => s >= 0.3).length;
+    if (significantLayers >= 1) {
+        totalScore = Math.max(totalScore, 0.35); // Minimum 35% if any layer is significant
+    }
+    if (significantLayers >= 2) {
+        totalScore = Math.min(totalScore * 1.5, 1.0); // 50% boost for multiple layer hits
+    }
 
     // Determine categories
     const categories = [
@@ -93,7 +103,7 @@ function analyzePatterns(msg) {
     for (const [category, regexList] of Object.entries(SCAM_PATTERNS)) {
         for (const regex of regexList) {
             if (regex.test(msg)) {
-                score += 0.15;
+                score += 0.25; // Boosted from 0.15
                 categories.push(category);
                 patterns.push(regex.source);
             }
@@ -103,7 +113,7 @@ function analyzePatterns(msg) {
     // Phrase matching (higher weight)
     for (const phrase of SCAM_PHRASES) {
         if (msg.includes(phrase.toLowerCase())) {
-            score += 0.20;
+            score += 0.40; // Boosted from 0.20 - phrases are strong indicators
             patterns.push(phrase);
         }
     }
@@ -223,6 +233,20 @@ function analyzeContext(msg, history) {
         score += 0.3;
         categories.push('banking');
         patterns.push('authority_impersonation');
+    }
+
+    // PHISHING: Click link + reward/money promise = high scam
+    if (/click|link|url/i.test(msg) && /reward|prize|money|win|cash|free|rupee|₹|\d+.*rs/i.test(msg)) {
+        score += 0.6;
+        categories.push('phishing');
+        patterns.push('reward_link_phishing');
+    }
+
+    // LOTTERY: You won/selected + prize = high scam
+    if (/won|win|selected|lucky|congratulations/i.test(msg) && /prize|lottery|money|cash|reward/i.test(msg)) {
+        score += 0.6;
+        categories.push('phishing');
+        patterns.push('lottery_scam');
     }
 
     // EDGE CASE: Contradiction detection (false compliance trap)

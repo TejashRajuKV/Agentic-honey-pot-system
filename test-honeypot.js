@@ -74,21 +74,11 @@ async function testAPI(scenario) {
         console.log(`📨 User Message: "${scenario.payload.message}"`);
         console.log(`\n🤖 Agent Reply: "${data.reply}"`);
         console.log(`\n📊 Detection Results:`);
-        console.log(`   - Scam Detected: ${data.isScam ? '🚨 YES' : '✅ NO'}`);
-        console.log(`   - Confidence: ${(data.confidence * 100).toFixed(1)}%`);
-        console.log(`   - Phase: ${data.engagementPhase}`);
+        console.log(`   - Scam Detected: ${data.scamDetected ? '🚨 YES' : '✅ NO'}`);
+        console.log(`   - Probability: ${data.scamProbability}%`);
+        console.log(`   - Phase: ${data.phase}`);
+        console.log(`   - Patterns: ${data.patterns?.join(', ') || 'none'}`);
         console.log(`   - Status: ${data.status}`);
-
-        if (data.debug) {
-            console.log(`\n🔍 Debug Info:`);
-            console.log(`   - Categories: ${data.debug.detectedCategories.join(', ') || 'none'}`);
-            if (data.debug.extractedIntel) {
-                console.log(`   - UPI IDs: ${data.debug.extractedIntel.upiIds.join(', ') || 'none'}`);
-                console.log(`   - Phone Numbers: ${data.debug.extractedIntel.phoneNumbers.join(', ') || 'none'}`);
-                console.log(`   - URLs: ${data.debug.extractedIntel.urls.join(', ') || 'none'}`);
-                console.log(`   - Scam Phrases: ${data.debug.extractedIntel.scamPhrases.slice(0, 3).join(', ')}`);
-            }
-        }
 
     } catch (error) {
         console.log(`\n${'='.repeat(70)}`);

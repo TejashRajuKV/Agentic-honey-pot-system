@@ -56,6 +56,32 @@ const sessionSchema = new Schema({
         max: 1
     },
 
+    // ========================================================================
+    // RISK ACCUMULATION STATE (MONOTONIC - NEVER DECREASES)
+    // ========================================================================
+
+    // Once true, ALWAYS true for entire session
+    scamEverDetected: {
+        type: Boolean,
+        default: false
+    },
+
+    // Maximum probability ever seen (can only increase)
+    maxScamProbability: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100
+    },
+
+    // Highest phase ever reached (can only progress forward)
+    // Phase order: early(0) → mid(1) → late(2) → final(3)
+    highestPhase: {
+        type: String,
+        enum: ['early', 'mid', 'late', 'final'],
+        default: 'early'
+    },
+
     // Current response mode (one-way: NORMAL → DEFENSIVE → BLOCKING → TERMINATE)
     responseMode: {
         type: String,
