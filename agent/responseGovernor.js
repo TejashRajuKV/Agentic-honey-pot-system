@@ -19,10 +19,12 @@
 // ============================================================================
 
 const RESPONSE_MODES = {
-    NORMAL: 'NORMAL',           // 0-14% - Allow clarification and neutral questions
-    DEFENSIVE: 'DEFENSIVE',     // 15-29% - Express hesitation, slow conversation
-    BLOCKING: 'BLOCKING',       // 30-44% - Refusal, redirect to official channels
-    TERMINATE: 'TERMINATE'      // 45%+ OR aggression - End conversation immediately
+    NORMAL: 'NORMAL',           // 0-39% - Allow clarification and neutral questions
+    DEFENSIVE: 'DEFENSIVE',     // 40-64% - Express hesitation, slow conversation
+    BLOCKING: 'BLOCKING',       // 65-79% - Refusal, redirect to official channels
+    TERMINATE: 'TERMINATE'      // 80%+ OR abuse - End conversation
+    // NOTE: Thresholds raised so honeypot ENGAGES before refusing.
+    // A real honeypot must play along to extract intelligence.
 };
 
 // Mode priority order (for comparison)
@@ -151,24 +153,24 @@ function getResponseMode(confidence, context = {}) {
     const riskPercent = confidence * 100;
     const { aggressionDetected = false, repetitionCount = 0 } = context;
 
-    // GUARDRAIL 2: Aggression = instant TERMINATE
+    // Only explicit abuse/aggression triggers instant TERMINATE
     if (aggressionDetected) {
         return RESPONSE_MODES.TERMINATE;
     }
 
-    // GUARDRAIL 3: Repetition (3+) = force TERMINATE
-    if (repetitionCount >= 3) {
+    // Excessive repetition (5+) signals bot/spam — terminate
+    if (repetitionCount >= 5) {
         return RESPONSE_MODES.TERMINATE;
     }
 
-    // Standard threshold logic (STRICTER than before)
-    if (riskPercent >= 45) {
+    // Raised thresholds: honeypot must engage long enough to extract intel
+    if (riskPercent >= 80) {
         return RESPONSE_MODES.TERMINATE;
     }
-    if (riskPercent >= 30) {
+    if (riskPercent >= 65) {
         return RESPONSE_MODES.BLOCKING;
     }
-    if (riskPercent >= 15) {
+    if (riskPercent >= 40) {
         return RESPONSE_MODES.DEFENSIVE;
     }
     return RESPONSE_MODES.NORMAL;
@@ -284,47 +286,58 @@ function governResponse(confidence, proposedResponse, options = {}) {
 
     console.log(`[Governor] State: ${fsmState}, Scenario: ${fsmScenario}, Mode: ${mode}`);
 
-    // RULE: Response Locking for HIGH_RISK and above
+    // RULE: Hard-lock ONLY for explicit termination (abuse).
+    // For HIGH_RISK / CONFIRMED_SCAM the honeypot still engages with varied
+    // responses — locking to one static reply kills the conversation and
+    // prevents intelligence extraction.
     if (fsmState === 'TERMINATED') {
         const lib = RESPONSE_LIBRARY['TERMINATED'];
         response = lib[fsmScenario] || lib['default'];
         overridden = true;
         guardrailTriggered = 'STATE_TERMINATED';
-    } else if (fsmState === 'CONFIRMED_SCAM') {
-        const lib = RESPONSE_LIBRARY['CONFIRMED_SCAM'];
-        response = lib[fsmScenario] || lib['default'];
+    } else if (mode === RESPONSE_MODES.TERMINATE) {
+        // High confidence (80%+) — use a varied terminate template
+        response = pickRandomTemplate(TERMINATE_TEMPLATES);
         overridden = true;
-        guardrailTriggered = 'STATE_CONFIRMED_SCAM';
-    } else if (fsmState === 'HIGH_RISK') {
-        const lib = RESPONSE_LIBRARY['HIGH_RISK'];
-        response = lib[fsmScenario] || lib['default'];
-        overridden = true;
-        guardrailTriggered = 'STATE_HIGH_RISK';
+        guardrailTriggered = 'MODE_TERMINATE';
     } else if (mode === RESPONSE_MODES.BLOCKING) {
+        // 65-79% — use a varied blocking template
         response = pickRandomTemplate(BLOCKING_TEMPLATES);
         overridden = true;
         guardrailTriggered = 'MODE_BLOCKING';
     } else if (mode === RESPONSE_MODES.DEFENSIVE) {
+        // 40-64% — use a varied defensive template
         response = pickRandomTemplate(DEFENSIVE_TEMPLATES);
         overridden = true;
         guardrailTriggered = 'MODE_DEFENSIVE';
     } else {
-        response = proposedResponse;
-        overridden = false;
-    }
-
-    // FINAL SAFETY CHECK: NO QUESTIONS in HIGH_RISK or higher, or BLOCKING/TERMINATE mode
-    if (['HIGH_RISK', 'CONFIRMED_SCAM', 'TERMINATED'].includes(fsmState) || [RESPONSE_MODES.BLOCKING, RESPONSE_MODES.TERMINATE].includes(mode)) {
-        if (response.includes('?')) {
-            response = response.split('?')[0].trim() + '.';
-            guardrailTriggered = (guardrailTriggered || 'UNSAFE_PROPOSED_RESPONSE') + '_FORCED_NO_QUESTION';
+        // NORMAL mode — let the agent's own response through
+        // Validate it doesn't contain banned phrases for the FSM state
+        if (fsmState === 'CONFIRMED_SCAM' && containsBannedPhrase(proposedResponse, RESPONSE_MODES.BLOCKING)) {
+            response = pickRandomTemplate(BLOCKING_TEMPLATES);
+            overridden = true;
+            guardrailTriggered = 'CONFIRMED_SCAM_BANNED_PHRASE';
+        } else if (fsmState === 'HIGH_RISK' && containsBannedPhrase(proposedResponse, RESPONSE_MODES.DEFENSIVE)) {
+            response = pickRandomTemplate(DEFENSIVE_TEMPLATES);
+            overridden = true;
+            guardrailTriggered = 'HIGH_RISK_BANNED_PHRASE';
+        } else {
+            response = proposedResponse;
+            overridden = false;
         }
     }
 
-    // APPEND SAFETY ADVICE if in high risk or confirmed scam
-    if ((['HIGH_RISK', 'CONFIRMED_SCAM'].includes(fsmState) || mode === RESPONSE_MODES.BLOCKING) && safetyAdvice.length > 0) {
+    // FINAL SAFETY CHECK: No questions in BLOCKING or TERMINATE mode
+    if ([RESPONSE_MODES.BLOCKING, RESPONSE_MODES.TERMINATE].includes(mode) || fsmState === 'TERMINATED') {
+        if (response.includes('?')) {
+            response = response.split('?')[0].trim() + '.';
+            guardrailTriggered = (guardrailTriggered || 'QUESTION_STRIPPED');
+        }
+    }
+
+    // APPEND SAFETY ADVICE only in BLOCKING mode or higher (not in DEFENSIVE/NORMAL)
+    if (mode === RESPONSE_MODES.BLOCKING && safetyAdvice.length > 0) {
         const adviceStr = " For your safety: " + safetyAdvice.slice(0, 2).join("; ");
-        // Avoid double-appending if the response already contains similar advice
         if (!response.toLowerCase().includes("safety") && !response.toLowerCase().includes("official")) {
             response += adviceStr;
             guardrailTriggered = (guardrailTriggered || '') + '_ADVICE_APPENDED';

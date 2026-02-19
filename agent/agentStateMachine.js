@@ -22,14 +22,22 @@ const STATE_HIERARCHY = {
 };
 
 const NON_NEGOTIABLE_TRIGGERS = [
-    { pattern: /click.*link|visit.*url|bit\.ly|t\.co/i, state: AGENT_STATES.HIGH_RISK, scenario: 'link_request' },
-    { pattern: /won.*prize|reward.*5000|lottery|winner|crore|lakh/i, state: AGENT_STATES.HIGH_RISK, scenario: 'reward' },
-    { pattern: /otp.*request|send.*code|tell.*otp|verification.*code/i, state: AGENT_STATES.CONFIRMED_SCAM, scenario: 'otp_request' },
-    { pattern: /payment.*request|send.*money|transfer.*amount|pay.*₹|upi.*id/i, state: AGENT_STATES.CONFIRMED_SCAM, scenario: 'payment_request' },
-    { pattern: /threat|legal.*action|police|arrest|court|jail|case/i, state: AGENT_STATES.HIGH_RISK, scenario: 'threat' },
-    { pattern: /blocked|frozen|suspended|deactivated|within.*minutes|immediately|urgent|now|deadline/i, state: AGENT_STATES.HIGH_RISK, scenario: 'urgency_threat' },
-    { pattern: /bank|rbi|income.*tax|cbi|police.*department/i, state: AGENT_STATES.SUSPICIOUS, scenario: 'authority_claim' },
-    { pattern: /stupid|idiot|waste.*time|useless|abuse/i, state: AGENT_STATES.TERMINATED, scenario: 'abuse' }
+    // Phishing links — must have click/visit + link context
+    { pattern: /click\s+(this|the|here|on)?\s*(link|url|below)|bit\.ly\/|tinyurl\.com|visit\s+(this|the)\s+(link|url|site)/i, state: AGENT_STATES.HIGH_RISK, scenario: 'link_request' },
+    // Prize/lottery — must have won/claim + prize/reward
+    { pattern: /you\s+(have\s+)?won\b|lottery\s+winner|lucky\s+(winner|draw)|claim\s+(your\s+)?(prize|reward|cash|money)/i, state: AGENT_STATES.HIGH_RISK, scenario: 'reward' },
+    // OTP — must explicitly request the code
+    { pattern: /share\s+(the\s+)?(otp|code|pin\b)|send\s+(me\s+)?(the\s+)?(otp|pin\b|verification\s+code)|tell\s+(me\s+)?(your\s+)?(otp|code)/i, state: AGENT_STATES.CONFIRMED_SCAM, scenario: 'otp_request' },
+    // Payment — must ask for money transfer or UPI
+    { pattern: /send\s+(money|funds|₹|rs\.?\s*\d)|transfer\s+(the\s+)?(amount|money|funds)|pay\s+(₹|rs\.?\s*\d|now\s+to)|share\s+(your\s+)?upi\s+(id|number)/i, state: AGENT_STATES.CONFIRMED_SCAM, scenario: 'payment_request' },
+    // Legal threats — specific legal consequences
+    { pattern: /legal\s+action\s+(will|has)\s+be|you\s+(will\s+be|are\s+being)\s+arrested|court\s+(notice|summon)|warrant\s+(issued|against)/i, state: AGENT_STATES.HIGH_RISK, scenario: 'threat' },
+    // Authority + account action together
+    { pattern: /(rbi|reserve\s+bank|income\s+tax|cbi|enforcement\s+directorate).{0,50}(account|kyc|verify|block|action|notice)/i, state: AGENT_STATES.SUSPICIOUS, scenario: 'authority_claim' },
+    // Account urgency — needs BOTH account threat AND time pressure
+    { pattern: /(account|kyc|bank\s+account).{0,40}(block|frozen|suspend|deactivat).{0,40}(immediately|urgent|within\s+\d|in\s+\d+\s+minutes)/i, state: AGENT_STATES.HIGH_RISK, scenario: 'urgency_threat' },
+    // Explicit verbal abuse only
+    { pattern: /\b(stupid|idiot|moron|useless\s+bot)\b|shut\s+up|waste\s+of\s+(my\s+)?time/i, state: AGENT_STATES.TERMINATED, scenario: 'abuse' }
 ];
 
 /**
@@ -48,13 +56,14 @@ function updateAgentState(currentMessage, detectionResults, currentState = AGENT
         }
     }
 
-    // fallback to confidence-based state if no triggers hit
+    // Fallback to confidence-based state if no triggers hit
+    // Raised thresholds to align with governor (honeypot should engage first)
     const confidence = detectionResults.confidence || 0;
-    if (confidence > 0.8 && STATE_HIERARCHY[AGENT_STATES.CONFIRMED_SCAM] > STATE_HIERARCHY[nextState]) {
+    if (confidence > 0.85 && STATE_HIERARCHY[AGENT_STATES.CONFIRMED_SCAM] > STATE_HIERARCHY[nextState]) {
         nextState = AGENT_STATES.CONFIRMED_SCAM;
-    } else if (confidence > 0.4 && STATE_HIERARCHY[AGENT_STATES.HIGH_RISK] > STATE_HIERARCHY[nextState]) {
+    } else if (confidence > 0.65 && STATE_HIERARCHY[AGENT_STATES.HIGH_RISK] > STATE_HIERARCHY[nextState]) {
         nextState = AGENT_STATES.HIGH_RISK;
-    } else if (confidence > 0.20 && STATE_HIERARCHY[AGENT_STATES.SUSPICIOUS] > STATE_HIERARCHY[nextState]) {
+    } else if (confidence > 0.40 && STATE_HIERARCHY[AGENT_STATES.SUSPICIOUS] > STATE_HIERARCHY[nextState]) {
         nextState = AGENT_STATES.SUSPICIOUS;
     }
 
