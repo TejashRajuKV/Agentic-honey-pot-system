@@ -1,3 +1,106 @@
+# 🛡️ CyberRakshak — AI Cybersecurity Platform
+
+One project, one port, one command. CyberRakshak combines two previously separate systems:
+
+- **Agentic Honey-Pot** (Node.js): detects scams, engages scammers as a believable victim persona, extracts UPI IDs / phone numbers / links, and produces evidence reports.
+- **CyberRakshak ML suite** (Python): scam, fake-news, phishing, loan-app and behaviour models plus a multi-vector threat fusion engine.
+
+They now run as a single application with one web console.
+
+```
+Browser (React, served by the gateway)
+   │  same origin — http://localhost:3000
+   ▼
+Node gateway  (src/)  ── /api/v1/console/*   honeypot agent, sessions        ┐
+   │                  ── /api/v1/messages    evaluator endpoint (x-api-key)  │ Node engine:
+   │                  ── /api/v1/analytics | intelligence | profiles |       │ detection/, agent/,
+   │                     alerts | quality | reports | language               ┘ shared-contracts/
+   │                  ── /api/v1/ml/*        ──►  Python ML engine (ml/)  ← spawned & supervised by Node,
+   │                  ── /api/v1/system/status   health of every subsystem       loopback-only (127.0.0.1:5050)
+   ▼
+MongoDB  (sessions, turns, profiles, intel, alerts, quality, analytics)
+```
+
+The honeypot pipeline calls the ML engine on every message (`mlEnrichment` in the response), so both halves feed each other:
+web console → gateway → detection + ML → persona agent → extraction → MongoDB → gateway → console.
+
+## Quick start
+
+```bash
+npm run install:all      # node deps + frontend deps + python deps (requirements.txt)
+npm run build            # builds frontend/dist
+npm start                # http://localhost:3000 — UI, APIs, and the ML engine (auto-started)
+```
+
+Requirements: Node 18+ (fetch), Python 3.10+, MongoDB. Copy `.env.example` → `.env` and fill it in.
+
+Development with hot reload: `npm run dev` (gateway on :3000 + Vite on :5173, which proxies `/api` to the gateway).
+
+## Testing — is the whole website ready?
+
+| Command | What it does |
+|---|---|
+| `npm run test:readiness` | The full readiness suite, six sprints (~10 min). Needs MongoDB and Chrome/Edge installed; starts its own gateways on ports 3110-3117 and never touches your running server. |
+| `node tests/readiness/run.js 1` … `6` | Run a single sprint |
+| `npm test` | The 48-check feature suite (`scripts/e2e.js`) on a private gateway |
+
+1. **Static integrity** — every backend file parses, every import/dependency resolves, Python compiles, models exist, frontend builds with zero warnings, assets exist.
+2. **Backend runtime** — clean boot log, every one of the 57+ routes answers, a coverage guard fails if a route has no test.
+3. **Frontend ↔ backend wiring** — every API call the UI makes matches a real route, every backend route has a UI (or is marked non-UI), and every response field the UI reads exists.
+4. **Website in a real browser** — headless Chrome drives Home + every dashboard view + the real workflows; fails on any console error, uncaught exception or failed request.
+5. **End-to-end workflows** — GUVI evaluator format, wrap-up + final-report callback, HMAC-signed alert webhooks, incident de-duplication, restart persistence, concurrency.
+6. **Failure modes** — ML engine down, database down, fuzzing of every write route, security basics.
+
+All test gateways send the GUVI final-report callback to a local sink (`EVALUATION_CALLBACK_URL`), so a test can never post to the real evaluation endpoint. By default the platform posts final reports to the GUVI endpoint; set `EVALUATION_CALLBACK_URL` only for staging/testing.
+
+## What is in the console
+
+The dashboard is organised into eight modules. Each view is wired to a real endpoint.
+
+| # | Module | Views → backend |
+|---|---|---|
+| 1 | **Threat Detection** | Scam · Fake News · Behavior Anomaly · Phishing (offline URL intelligence: look-alike / punycode domains, brand impersonation, HTTPS is not a driver) · Loan Apps · Multi-Vector → `/api/v1/ml/{scam,fakenews,behavior,phishing,loan,loan/rules,loan/check-app,threat}`; dark-web check → `/console/breach-check` |
+| 2 | **Autonomous Honeypot** | Live Engagement → `POST /console/messages` (detection → ML → persona agent with emotion + bait strategy → extraction → MongoDB). Conversations → `/console/sessions*` (transcript, agent state, **scam kill chain** `/killchain`, audit trail, per-turn quality). Every reply passes the **agent safety governor** (`agent/replySafety.js`: PII leak, AI/honeypot reveal, prompt injection) |
+| 3 | **Threat Intelligence** | Harvested Indicators (UPI, phones, URLs, amounts, keywords, tactics) → `/console/intelligence/summary`. Identifier Database → `/console/known-identifiers`, `/intelligence/{check,network}` (cross-session correlation) |
+| 4 | **Scammer Intelligence** | Profiles → `/profiles`, `/intelligence/{threats,profile}`, `/profiles/match`. Campaigns → `/console/campaigns` (sessions grouped by shared UPI / phone / domain, labelled "potentially linked"). Archetypes & Vulnerability → sessions + profiles aggregates |
+| 5 | **Protection** | **Risk Fusion** → `POST /console/risk`: message + URL + app + identifiers → one score with per-signal points and evidence (weights in `src/config/riskWeights.json`); safety guidance via `/console/analyze`. Alerts → `/alerts/*` with HMAC-signed webhooks, delivery metrics, and correlated **incidents** (`/console/incidents`) |
+| 6 | **Analytics** | Metrics & Trends → `/analytics/*`, Quality Scores → `/quality/metrics`, Language → `/language/*` |
+| 7 | **Reports** | Investigator-grade PDF / JSON (risk breakdown, kill chain, campaign, agent safety, provenance) → `/reports/*`; analytics CSV/JSON; **STIX 2.1 export** → `/console/stix` |
+| 8 | **Integrations** | GUVI evaluator API, LLM, webhooks, ML engine, MongoDB, breach lookup → `/api/v1/system/status` |
+
+The Home page status panel also reads `/api/v1/system/status`; Scam Radar can hand a message to the honeypot agent.
+
+After every honeypot turn the gateway (in the background) scores the agent's reply, fires alerts when thresholds are crossed, builds scammer profiles, and re-aggregates analytics every 15 minutes (`src/services/postProcessService.js`).
+
+## Project layout
+
+```
+src/          Express gateway: routes, controllers, services, models
+agent/        Persona agent, FSM, response governor, LLM (Gemini) + rule-based fallback
+detection/    Scam detection, intelligence extraction, emotion detection
+ml/           Python ML engine (Flask) — models/*.pkl, training/, routes/
+frontend/     React + Vite console (builds to frontend/dist, served by the gateway)
+scripts/      dev.js (one-command dev), e2e.js (end-to-end verification)
+docs/         Reference docs, incl. docs/cyberrakshak/ (original ML project docs)
+```
+
+## Configuration (`.env`)
+
+| Variable | Purpose |
+|---|---|
+| `PORT` | Gateway port (default 3000) |
+| `MONGODB_URI` | MongoDB connection |
+| `API_KEY` | Protects `POST /api/v1/messages` (the evaluator endpoint) |
+| `LLM_API_KEY` | Optional Gemini key; without it the agent runs rule-based |
+| `ML_PORT` / `CYBERRAKSHAK_URL` / `ML_AUTO_START` / `PYTHON_BIN` | ML engine supervision (defaults work; set `ML_AUTO_START=false` to host the engine yourself) |
+| `HIBP_API_KEY` | Optional — enables the dark-web breach check |
+
+Security note: `/api/v1/console/*` and the analytics/intelligence/alerts routes are unauthenticated (they back the browser console). Put the app behind your own auth or network boundary before exposing it publicly; `POST /api/v1/messages` remains key-protected.
+
+---
+
+# Honeypot engine reference
+
 # 🐝 Agentic Honey-Pot System
 
 > **AI-Powered Scam Detection & Intelligence Extraction Platform**
@@ -37,7 +140,6 @@ An advanced backend service that autonomously detects scam messages, engages sca
 | 6️⃣ | **Quality Scoring** | Response quality monitoring | ✅ Complete |
 | 7️⃣ | **Report Generation** | Professional PDF exports | ✅ Complete |
 | 8️⃣ | **Report Generation** | Professional PDF exports | ✅ Complete |
-| 9️⃣ | **Telegram Bot Integration** | Live interactive demo for judges | ✅ Complete |
 | 🔟 | **Adversarial Testing** | Red team simulation | ⏭️ Designed |
 
 **See [`NEW_FEATURES_GUIDE.md`](./NEW_FEATURES_GUIDE.md) for quick start guide**

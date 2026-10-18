@@ -1,5 +1,9 @@
 // src/routes/reports.js
 const express = require('express');
+// "Session … not found" is the caller's problem (404), everything else is ours (500)
+const fail = (res, error) =>
+    res.status(/not found/i.test(error.message) ? 404 : 500).json({ status: 'error', message: error.message });
+
 const router = express.Router();
 const reportService = require('../services/reportService');
 const path = require('path');
@@ -10,10 +14,10 @@ const path = require('path');
  */
 router.post('/generate', async (req, res) => {
     try {
-        const { sessionId, format = 'pdf' } = req.body;
+        const { sessionId, format = 'pdf' } = req.body || {};
 
-        if (!sessionId) {
-            return res.status(400).json({ status: 'error', message: 'sessionId required' });
+        if (typeof sessionId !== 'string' || !sessionId) {
+            return res.status(400).json({ status: 'error', message: 'sessionId (string) required' });
         }
 
         if (format === 'pdf') {
@@ -26,7 +30,7 @@ router.post('/generate', async (req, res) => {
             res.status(400).json({ status: 'error', message: 'Invalid format. Use "pdf" or "json"' });
         }
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        fail(res, error);
     }
 });
 
@@ -47,7 +51,7 @@ router.get('/:sessionId/pdf', async (req, res) => {
             }
         });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        fail(res, error);
     }
 });
 
@@ -68,7 +72,7 @@ router.get('/:sessionId/json', async (req, res) => {
             res.json({ status: 'success', data });
         }
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        fail(res, error);
     }
 });
 
@@ -81,7 +85,7 @@ router.get('/list', async (req, res) => {
         const reports = await reportService.listReports();
         res.json({ status: 'success', data: reports, count: reports.length });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        fail(res, error);
     }
 });
 
@@ -98,7 +102,7 @@ router.get('/:sessionId/timeline', async (req, res) => {
         const timeline = reportService.createTimelineSummary(turns);
         res.json({ status: 'success', data: timeline });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        fail(res, error);
     }
 });
 

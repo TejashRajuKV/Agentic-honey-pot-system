@@ -1,0 +1,238 @@
+/* ─────────────────────────────────────────
+   Boot Greeting — Spectrum Ring activation sequence
+ ───────────────────────────────────────── */
+
+.boot-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.boot-content {
+    position: relative;
+    z-index: 3;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+}
+
+/* ── Ring stage — persists across all three acts, only its center
+   content and label opacity change between them, so the ring itself
+   never re-mounts or jumps. ── */
+.boot-ring-stage {
+    position: relative;
+    width: clamp(340px, 48vw, 560px);
+    height: clamp(340px, 48vw, 560px);
+}
+
+.boot-ring-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+}
+
+.boot-ring-track {
+    stroke: none;
+}
+
+/* Sits just outside the ring's right edge rather than inside it — the
+   ring stays a clean, uninterrupted circle throughout the whole sequence. */
+.boot-title-outside {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: clamp(20px, 3vw, 36px);
+    /* An explicit width, not just max-width: a shrink-to-fit box wrapping
+       a flex-wrap row of individual letters can collapse to the width of
+       a single letter instead of the full line, stacking the title into
+       a tall single-column ransom note. Sized conservatively so ring +
+       margin + title still clears the viewport edge even at the ring's
+       largest size. */
+    width: clamp(140px, 20vw, 340px);
+    text-align: left;
+}
+
+.boot-title {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 2px;
+    font-family: 'Syne', var(--font-main, sans-serif);
+    font-size: clamp(20px, 2.8vw, 32px);
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #111111;
+    perspective: 400px;
+}
+
+/* Each word is its own inline-flex unit so a line wrap can only ever land
+   *between* words, never split a word (e.g. "RAKSHAK") across two lines. */
+.boot-title-word {
+    display: inline-flex;
+    margin-right: 0.32em;
+}
+
+.boot-title .letter {
+    display: inline-block;
+    opacity: 0;
+    transform-origin: 50% 100%;
+}
+
+.boot-tagline {
+    margin-top: 14px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #444444;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}
+
+/* ── Per-segment-pair labels — positioned just outside the ring,
+   roughly toward the pair of segments they narrate. This outer element
+   only ever gets a CSS `transform` (for positioning) — the entrance/exit
+   animations below target `.boot-ring-label-inner` instead, since
+   anime.js's `scale` writes an inline `transform` that would otherwise
+   silently wipe out the positioning transform on the same element. ── */
+.boot-ring-label {
+    position: absolute;
+    max-width: 220px;
+    font-size: clamp(14px, 2.2vw, 19px);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #111111;
+}
+
+.boot-ring-label-inner {
+    display: block;
+    opacity: 0;
+    will-change: transform, opacity, filter;
+}
+
+.boot-ring-label.pos-right {
+    left: 100%;
+    top: 50%;
+    transform: translate(28px, -50%);
+    text-align: left;
+}
+
+.boot-ring-label.pos-left {
+    right: 100%;
+    top: 50%;
+    transform: translate(-28px, -50%);
+    text-align: right;
+}
+
+.boot-ring-label.pos-top {
+    bottom: 100%;
+    left: 50%;
+    transform: translate(-50%, -18px);
+    text-align: center;
+}
+
+.boot-ring-label.pos-bottom {
+    top: 100%;
+    left: 50%;
+    transform: translate(-50%, 18px);
+    text-align: center;
+}
+
+/* ── Loading / init readout ── */
+.boot-progress-wrap {
+    width: min(340px, 70vw);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.boot-progress-track {
+    width: 100%;
+    height: 3px;
+    background: rgba(17, 17, 17, 0.12);
+    overflow: hidden;
+}
+
+.boot-progress-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #3730a3, #6b5bd6);
+    box-shadow: 0 0 8px rgba(55, 48, 163, 0.4);
+}
+
+.boot-status {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #555555;
+}
+
+.boot-skip {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: #555555;
+    opacity: 0.6;
+    z-index: 3;
+}
+
+@media (max-width: 700px) {
+    .boot-ring-stage { width: clamp(230px, 66vw, 320px); height: clamp(230px, 66vw, 320px); }
+    /* A radial N/E/S/W layout doesn't leave room beside a ring this size
+       on a narrow screen — stack the four labels as a vertical list below
+       it instead (safe since they're invisible again by the time the
+       reveal-phase progress bar occupies that space).
+       Each rule repeats the .pos-X class so its specificity actually
+       matches (rather than loses to) the base positioning rules above —
+       a bare `.boot-ring-label` selector here was silently losing that
+       fight regardless of the media query matching. Centered with
+       left:50% + a matching fixed negative margin-left (half the width)
+       rather than `left/right:0 + auto margins` — this label is often
+       *wider* than the ring-stage container itself, and auto-margin
+       centering only distributes space correctly when the container has
+       room to spare, not when the content overflows it. */
+    .boot-ring-label {
+        width: 240px;
+        max-width: 80vw;
+        text-align: center;
+        font-size: 12px;
+    }
+    .boot-ring-label.pos-right,
+    .boot-ring-label.pos-left,
+    .boot-ring-label.pos-top,
+    .boot-ring-label.pos-bottom {
+        left: 50%; right: auto; bottom: auto;
+        top: 100%;
+        margin-left: -120px;
+        transform: none;
+    }
+    .boot-ring-label.pos-right  { margin-top: 14px; }
+    .boot-ring-label.pos-bottom { margin-top: 42px; }
+    .boot-ring-label.pos-left   { margin-top: 70px; }
+    .boot-ring-label.pos-top    { margin-top: 98px; }
+    /* No room to the ring's right on a narrow screen — sit below it
+       instead (safe: the labels sharing that space are long since faded
+       out by the time the reveal phase mounts this). */
+    .boot-title-outside {
+        left: 50%; top: 100%;
+        transform: translateX(-50%);
+        margin-left: 0;
+        margin-top: 20px;
+        width: 84vw;
+        text-align: center;
+    }
+    .boot-title-outside .boot-title { justify-content: center; }
+    .boot-tagline { font-size: 9px; letter-spacing: 1.5px; }
+    .boot-skip { display: none; }
+}

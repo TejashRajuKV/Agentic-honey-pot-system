@@ -99,7 +99,7 @@ const alertConfigSchema = new Schema({
     auth: {
         type: {
             type: String,
-            enum: ['none', 'bearer', 'api_key', 'basic'],
+            enum: ['none', 'bearer', 'api_key', 'basic', 'hmac'],
             default: 'none'
         },
         token: String,
@@ -120,7 +120,10 @@ const alertConfigSchema = new Schema({
         failedDeliveries: { type: Number, default: 0 },
         lastAlertSent: Date,
         lastSuccessfulDelivery: Date,
-        lastFailure: Date
+        lastFailure: Date,
+        retries: { type: Number, default: 0 },
+        deadLetters: { type: Number, default: 0 },
+        latencySamples: { type: [Number], default: [] }
     },
 
     // Metadata
@@ -129,12 +132,11 @@ const alertConfigSchema = new Schema({
 });
 
 // Limit history to last 100 alerts
-alertConfigSchema.pre('save', function (next) {
+alertConfigSchema.pre('save', function () {
     if (this.history && this.history.length > 100) {
         this.history = this.history.slice(-100);
     }
     this.updatedAt = Date.now();
-    next();
 });
 
 module.exports = mongoose.model("AlertConfig", alertConfigSchema);

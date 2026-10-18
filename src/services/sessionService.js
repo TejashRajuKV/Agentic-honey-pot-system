@@ -10,24 +10,21 @@ const ConversationTurn = require("../models/ConversationTurn");
  * @returns {Object} - Session object
  */
 async function getOrCreateSession(sessionId, platform = "unknown", sender = "unknown") {
-    let session = await Session.findOne({ sessionId });
-
-    if (!session) {
-        session = new Session({
-            sessionId,
-            platform,
-            sender,
-            status: "active",
-            engagementPhase: "early"
-        });
-        await session.save();
-    } else {
-        // Update last active time
-        session.lastActiveAt = new Date();
-        await session.save();
+    // Atomic upsert: concurrent first messages for the same id can no longer race into a duplicate-key error
+    const attempt = () => Session.findOneAndUpdate(
+        { sessionId },
+        {
+            $set: { lastActiveAt: new Date() },
+            $setOnInsert: { sessionId, platform, sender, status: "active", engagementPhase: "early", createdAt: new Date() }
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    try {
+        return await attempt();
+    } catch (err) {
+        if (err && err.code === 11000) return attempt();   // lost the insert race — the document exists now
+        throw err;
     }
-
-    return session;
 }
 
 /**

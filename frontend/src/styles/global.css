@@ -1,0 +1,614 @@
+/* ─────────────────────────────────────────
+   CSS Variables — Warm Cream Editorial System
+ ───────────────────────────────────────── */
+:root {
+  /* ── Cream editorial — matches reference footer aesthetic ── */
+  --bg:      #FFFFFF;
+  --surface: #FFFFFF;
+  --panel:   rgba(255, 255, 255, 0.95);
+  --card:    #FFFFFF;
+  --card2:   #F5F3EE;
+  --border:  rgba(0, 0, 0, 0.12);
+  --cyan:    #3730a3;        /* Deep indigo — primary accent                */
+  --amber:   #c2622b;        /* Warm terracotta                             */
+  --red:     #c0392b;
+  --green:   #3a6b35;        /* Forest green                                */
+  --white:   #111111;        /* "White" = dark ink on cream                 */
+  --text:    #2c2c28;
+  --muted:   #7a7a72;
+  --font-mono:    'JetBrains Mono', monospace;
+  --font-main:    'Inter', sans-serif;
+  --font-serif:   'Instrument Serif', 'Playfair Display', Georgia, serif;
+  --font-display: 'Instrument Serif', 'Playfair Display', Georgia, serif;
+  --teal-accent: #2d8a78;
+  --blueprint-grid:
+    linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  --transition:    0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-offset: 5px 5px 0 rgba(10, 10, 10, 0.10);
+}
+
+/* ── Dark brutalist — opt-in via .dark-theme on body ── */
+.dark-theme {
+  --bg:      #0a0a0a;
+  --surface: #111111;
+  --panel:   rgba(17, 17, 17, 0.92);
+  --card:    #141414;
+  --card2:   #1c1c1c;
+  --border:  rgba(255, 255, 255, 0.85);
+  --cyan:    #8b6bff;
+  --amber:   #ff9500;
+  --red:     #ff4d3d;
+  --green:   #d6ff3f;
+  --white:   #f5f5f2;
+  --text:    #b9b9b3;
+  --muted:   #6f6f6a;
+  --blueprint-grid:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  --shadow-offset: 6px 6px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Keep .light-theme as alias for :root cream */
+.light-theme {
+  --bg:      #FFFFFF;
+  --surface: #FFFFFF;
+  --panel:   rgba(255, 255, 255, 0.95);
+  --card:    #FFFFFF;
+  --card2:   #F5F3EE;
+  --border:  rgba(0, 0, 0, 0.12);
+  --cyan:    #3730a3;
+  --amber:   #c2622b;
+  --red:     #c0392b;
+  --green:   #3a6b35;
+  --white:   #111111;
+  --text:    #2c2c28;
+  --muted:   #7a7a72;
+  --blueprint-grid:
+    linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  --shadow-offset: 5px 5px 0 rgba(10, 10, 10, 0.10);
+}
+
+/* ─────────────────────────────────────────
+   Reset
+ ───────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ─────────────────────────────────────────
+   Base
+ ───────────────────────────────────────── */
+html {
+  font-size: 16px;
+  /* scroll-behavior: smooth; -- disabled: 3D scroll uses its own rAF lerp */
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background var(--transition), color var(--transition);
+}
+
+/* Grid overlay — only visible in dark theme; hidden in cream/light mode */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: var(--blueprint-grid);
+  background-size: 60px 60px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+}
+
+.dark-theme body::before,
+body.dark-theme::before {
+  opacity: 1;
+}
+
+/* ─────────────────────────────────────────
+   Typography
+ ───────────────────────────────────────── */
+h1,
+h2,
+h3,
+h4 {
+  color: var(--white);
+  font-weight: 700;
+  line-height: 1.1;
+  transition: color var(--transition);
+}
+
+p {
+  line-height: 1.6;
+  color: var(--text);
+}
+
+a {
+  color: var(--cyan);
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+a:hover {
+  opacity: 0.8;
+}
+
+code,
+pre {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* ─────────────────────────────────────────
+   Scrollbar
+ ───────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cyan);
+}
+
+/* ─────────────────────────────────────────
+   Utility Classes
+ ───────────────────────────────────────── */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.text-cyan {
+  color: var(--cyan);
+}
+
+.text-green {
+  color: var(--green);
+}
+
+.text-red {
+  color: var(--red);
+}
+
+.text-yellow {
+  color: var(--yellow);
+}
+
+.text-white {
+  color: var(--white);
+}
+
+/* Status chip — earthy/warm colour in cream theme, lime in dark theme */
+.lime-chip {
+  background: #c8e6c9;
+  color: #1b5e20;
+  border: 1.5px solid #81c784;
+}
+
+.dark-theme .lime-chip {
+  background: #d6ff3f;
+  color: #0a0a0a;
+  border: none;
+}
+
+/* ─────────────────────────────────────────
+   Brutalist Corner "+" Marks — shared across pages
+ ───────────────────────────────────────── */
+.corner-decor {
+  position: fixed;
+  width: 20px;
+  height: 20px;
+  z-index: 999;
+  pointer-events: none;
+  color: var(--border);
+}
+
+.corner-decor::before,
+.corner-decor::after {
+  content: '';
+  position: absolute;
+  background: var(--border);
+}
+
+.corner-decor::before {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.corner-decor::after {
+  left: 50%;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+.corner-decor.top-left     { top: 80px; left: 20px; }
+.corner-decor.top-right    { top: 80px; right: 20px; }
+.corner-decor.bottom-left  { bottom: 20px; left: 20px; }
+.corner-decor.bottom-right { bottom: 20px; right: 20px; }
+
+/* ─────────────────────────────────────────
+   Navbar — Brutalist Top Bar
+ ───────────────────────────────────────── */
+.technical-status-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 64px;
+  background: rgba(8, 8, 10, 0.28);
+  backdrop-filter: blur(10px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  transform: translateY(0);
+  opacity: 1;
+  transition: background 0.35s ease, border 0.35s ease, height 0.35s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.35s ease, backdrop-filter 0.35s ease, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+}
+
+/* Fully hidden while the hero video is the focus (home page, unscrolled) */
+.technical-status-bar.is-hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Glass/HUD state (unscrolled, floating over the hero video) — force
+   light, high-contrast text regardless of the active light/dark theme,
+   since the bar sits over varied video content, not the page background. */
+.technical-status-bar:not(.is-scrolled) .navbar-brand,
+.technical-status-bar:not(.is-scrolled) .navbar-clock .clock-time,
+.technical-status-bar:not(.is-scrolled) .label,
+.technical-status-bar:not(.is-scrolled) .status-text {
+  color: #f5f5f2;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+
+.technical-status-bar:not(.is-scrolled) .navbar-brand .brand-mark {
+  color: #b9a3ff;
+}
+
+.technical-status-bar:not(.is-scrolled) .navbar-link {
+  color: rgba(245, 245, 242, 0.75);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+
+.technical-status-bar:not(.is-scrolled) .navbar-link:hover {
+  color: #f5f5f2;
+}
+
+.technical-status-bar:not(.is-scrolled) .navbar-clock {
+  border-right-color: rgba(255, 255, 255, 0.25);
+}
+
+.technical-status-bar:not(.is-scrolled) .theme-toggle-container {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.technical-status-bar:not(.is-scrolled) .status-divider {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.technical-status-bar.is-scrolled {
+  height: 52px;
+  background: var(--surface);
+  backdrop-filter: blur(16px) saturate(160%);
+  border-bottom: 2px solid var(--border);
+  box-shadow: 0 4px 0 var(--border);
+}
+
+.nav-container-simplified {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0 32px;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--white);
+  text-transform: uppercase;
+  transition: color 0.35s ease, text-shadow 0.35s ease;
+}
+
+.navbar-brand .brand-mark {
+  width: 22px;
+  height: 22px;
+  color: var(--cyan);
+  flex-shrink: 0;
+  transition: color 0.35s ease;
+}
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.navbar-link {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  transition: color 0.2s;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+.navbar-link:hover {
+  color: var(--white);
+  opacity: 1;
+}
+
+.navbar-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  line-height: 1.5;
+  padding-right: 20px;
+  border-right: 1px solid var(--border);
+  margin-right: 20px;
+  transition: border-color 0.35s ease;
+}
+
+.navbar-clock .clock-time {
+  color: var(--white);
+  font-weight: 700;
+  transition: color 0.35s ease, text-shadow 0.35s ease;
+}
+
+.navbar-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.navbar-cta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--white);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  padding: 10px 20px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.navbar-cta:hover {
+  background: var(--cyan);
+  color: #f5f5f2;
+  transform: translate(-2px, -2px);
+  box-shadow: 3px 3px 0 var(--border);
+}
+
+.backend-status-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-divider {
+  color: var(--border);
+  font-weight: 100;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.online {
+  background: var(--green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 25%, transparent);
+}
+
+.status-dot.offline {
+  background: var(--red);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 25%, transparent);
+}
+
+.status-text {
+  font-size: 11px;
+  letter-spacing: 1px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* ─────────────────────────────────────────
+   Fade animations
+ ───────────────────────────────────────── */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes glowPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(139, 107, 255, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 32px rgba(139, 107, 255, 0.9);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes borderDash {
+  from {
+    background-position: 0 0, 100% 0, 0 100%, 0 0;
+  }
+
+  to {
+    background-position: 100% 0, 0 100%, 0 0, 0 100%;
+  }
+}
+
+.fade-up {
+  animation: fadeUp 0.5s ease both;
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease both;
+}
+
+.pulse {
+  animation: pulse 1.5s ease infinite;
+}
+
+/* ─────────────────────────────────────────
+   Brutalist Theme Switch
+ ───────────────────────────────────────── */
+.theme-toggle-container {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  margin-right: 10px;
+  padding: 4px 12px;
+  border: 2px solid var(--border);
+  gap: 10px;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.theme-toggle-container:hover {
+  background: var(--cyan);
+}
+
+.theme-toggle-container:hover .label {
+  color: var(--white);
+}
+
+.theme-switch-forensic {
+  width: 44px;
+  height: 22px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 0;
+  position: relative;
+  padding: 2px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.switch-dial {
+  width: 14px;
+  height: 14px;
+  background: var(--cyan);
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: var(--bg);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.theme-switch-forensic.light .switch-dial {
+  transform: translateX(20px);
+  background: var(--amber);
+}

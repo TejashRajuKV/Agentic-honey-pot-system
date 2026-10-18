@@ -22,7 +22,8 @@ const auditLogSchema = new Schema({
             'INTELLIGENCE_EXTRACTED',
             'REPEAT_SCAMMER_DETECTED',
             'SESSION_TERMINATED',
-            'CALLBACK_SENT'
+            'CALLBACK_SENT',
+            'SAFETY_INTERVENTION'
         ],
         required: true
     },
@@ -62,6 +63,9 @@ const auditLogSchema = new Schema({
         previousSessions: Number,
         riskLevel: String
     },
+
+    // Agent safety governor findings
+    safety: [{ check: String, detail: String }],
 
     // Metadata
     platform: String,

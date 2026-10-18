@@ -16,8 +16,8 @@ const scammerProfileSchema = new Schema({
 
     // Primary identifiers extracted from conversations
     identifiers: {
-        upiIds: [{ type: String, index: true }],
-        phoneNumbers: [{ type: String, index: true }],
+        upiIds: [String],
+        phoneNumbers: [String],
         urls: [{ type: String }],
         emailAddresses: [{ type: String }]
     },
@@ -141,9 +141,8 @@ scammerProfileSchema.index({ riskScore: -1 });
 scammerProfileSchema.index({ lastSeen: -1 });
 
 // Update timestamp on save
-scammerProfileSchema.pre('save', function (next) {
+scammerProfileSchema.pre('save', function () {
     this.updatedAt = Date.now();
-    next();
 });
 
 module.exports = mongoose.model("ScammerProfile", scammerProfileSchema);

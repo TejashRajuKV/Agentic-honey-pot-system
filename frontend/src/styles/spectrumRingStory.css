@@ -1,0 +1,200 @@
+/* ── Spectrum Ring Story — scroll-scrubbed "Critical Threat Intel
+   Report" section. A tall runway (.ring-story-wrapper) holds a pinned
+   stage (.ring-story-sticky, position: sticky) whose ring segments,
+   arrows and cards are driven directly by scroll position — nothing here
+   autoplays, every value is a pure function of scrollY read each frame. ── */
+
+.ring-story-wrapper {
+    position: relative;
+    height: 340vh;
+}
+
+.ring-story-sticky {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+}
+
+.ring-story-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: clamp(16px, 2.4vh, 28px);
+    max-height: 100vh;
+    padding-top: 90px;
+    padding-bottom: 24px;
+}
+
+.ring-story-heading {
+    margin-bottom: 0;
+    font-size: clamp(30px, 4.4vw, 50px);
+    text-align: center;
+}
+
+.ring-story-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(28px, 5.5vw, 84px);
+}
+
+/* ── Ring ── */
+.ring-story-visual {
+    position: relative;
+    flex-shrink: 0;
+    width: clamp(340px, 48vh, 580px);
+    height: clamp(340px, 48vh, 580px);
+}
+
+.ring-story-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+    filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.12));
+}
+
+.ring-track {
+    stroke: var(--border);
+    opacity: 0.5;
+}
+
+.ring-center-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    pointer-events: none;
+}
+
+.ring-center-idx {
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 8px;
+}
+
+.ring-center-code {
+    font-size: clamp(19px, 2.3vw, 28px);
+    font-weight: 700;
+    color: var(--white);
+    letter-spacing: 1px;
+}
+
+.ring-center-sub {
+    margin-top: 10px;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--cyan);
+    animation: pulse 2s ease infinite;
+}
+
+/* ── Card slot — fixed height, rows crossfade in place so total section
+   height never depends on how much report text a card holds. ── */
+.ring-story-cards {
+    position: relative;
+    /* Absolutely-positioned rows (below) give this box no intrinsic
+       content size, so flex-shrink would collapse a plain `width: 100%`
+       to zero — pin an explicit basis + floor instead. */
+    flex: 1 1 480px;
+    min-width: 380px;
+    max-width: 620px;
+    height: clamp(300px, 42vh, 400px);
+}
+
+.ring-story-row {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ring-story-arrow {
+    width: clamp(58px, 7vw, 96px);
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.ring-story-card {
+    opacity: 0;
+    flex: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(26px, 3.6vh, 38px) 36px;
+    will-change: transform, opacity, filter;
+    overflow: hidden;
+}
+
+.ring-story-card .t-title {
+    font-size: 26px;
+    margin-bottom: 14px;
+}
+
+.ring-story-card .t-desc {
+    font-size: 16px;
+    line-height: 1.68;
+}
+
+.ring-story-card .t-meta {
+    margin-top: 18px;
+    padding-top: 14px;
+}
+
+.ring-story-card .report-header {
+    margin-bottom: 16px;
+}
+
+/* ── Scan progress bar ── */
+.ring-story-progress {
+    width: 100%;
+    max-width: 640px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+}
+
+.ring-story-progress-track {
+    flex: 1;
+    height: 2px;
+    background: var(--border);
+    position: relative;
+}
+
+.ring-story-progress-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    background: var(--cyan);
+}
+
+/* ── Responsive: stack vertically, ring on top ── */
+@media (max-width: 980px) {
+    .ring-story-wrapper { height: 420vh; }
+    .ring-story-container { padding-top: 80px; gap: 14px; }
+    .ring-story-main { flex-direction: column; gap: 18px; }
+    .ring-story-visual { width: clamp(220px, 52vw, 320px); height: clamp(220px, 52vw, 320px); }
+    /* Reset the desktop row's flex-basis (which would otherwise size this
+       box's *height*, not width, once .ring-story-main switches to a
+       column) and size it directly instead. */
+    .ring-story-cards { flex: 0 0 auto; width: 100%; max-width: 100%; min-width: 0; height: clamp(230px, 36vh, 290px); }
+    .ring-story-row { flex-direction: column; gap: 4px; justify-content: center; }
+    .ring-story-arrow { width: 30px; height: 40px; transform: rotate(90deg); }
+    .ring-story-card { padding: 12px 18px; }
+    .ring-story-card .t-desc { display: none; }
+}

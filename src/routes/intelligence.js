@@ -46,10 +46,10 @@ router.get('/profile/:id', async (req, res) => {
  */
 router.post('/correlate', async (req, res) => {
     try {
-        const { sessionId } = req.body;
+        const { sessionId } = req.body || {};
 
-        if (!sessionId) {
-            return res.status(400).json({ status: 'error', message: 'sessionId required' });
+        if (typeof sessionId !== 'string' || !sessionId) {
+            return res.status(400).json({ status: 'error', message: 'sessionId (string) required' });
         }
 
         const correlation = await threatIntel.correlateSessions(sessionId);

@@ -9,10 +9,10 @@ const languageService = require('../services/languageService');
  */
 router.post('/detect', async (req, res) => {
     try {
-        const { text } = req.body;
+        const { text } = req.body || {};
 
-        if (!text) {
-            return res.status(400).json({ status: 'error', message: 'text required' });
+        if (typeof text !== 'string' || !text.trim()) {
+            return res.status(400).json({ status: 'error', message: 'text (non-empty string) required' });
         }
 
         const detection = languageService.detectLanguage(text);
@@ -41,10 +41,10 @@ router.get('/stats/:sessionId', async (req, res) => {
  */
 router.post('/analyze-hinglish', async (req, res) => {
     try {
-        const { text } = req.body;
+        const { text } = req.body || {};
 
-        if (!text) {
-            return res.status(400).json({ status: 'error', message: 'text required' });
+        if (typeof text !== 'string' || !text.trim()) {
+            return res.status(400).json({ status: 'error', message: 'text (non-empty string) required' });
         }
 
         const analysis = languageService.handleHinglish(text);

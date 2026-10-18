@@ -3,3 +3,16 @@ node_modules/
 .DS_Store
 *.log
 npm-debug.log*
+
+# Integrated platform
+frontend/dist/
+frontend/node_modules/
+ml/venv/
+ml/__pycache__/
+**/__pycache__/
+*.pyc
+ml/.env
+frontend/.env*
+
+# Local editor config
+.claude/

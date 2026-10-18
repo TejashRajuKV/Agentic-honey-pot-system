@@ -212,7 +212,7 @@ function applyPersona(response, persona, phase) {
         response = response
             .replace(/UPI/g, 'payment app')
             .replace(/OTP/g, 'verification code')
-            .replace(/app/g, 'application');
+            .replace(/\bapp\b/g, 'application');
     }
 
     return response;

@@ -1,12 +1,17 @@
 {
-  "name": "honeypot-backend",
+  "name": "cyberrakshak-platform",
   "version": "1.0.0",
-  "description": "Agentic Honey-Pot System - AI-powered scam detection and engagement backend",
+  "description": "CyberRakshak — AI-powered cybersecurity platform: agentic honeypot, ML threat detection and a unified web console in one project",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node scripts/dev.js",
+    "build": "npm --prefix frontend run build",
+    "build:start": "npm run build && npm start",
+    "install:all": "npm install && npm --prefix frontend install && python -m pip install -r requirements.txt",
+    "test:e2e": "node scripts/e2e.js",
+    "test": "node scripts/e2e.js",
+    "test:readiness": "node tests/readiness/run.js"
   },
   "keywords": [
     "honeypot",
@@ -25,11 +30,11 @@
     "mongoose": "^9.1.5",
     "node-cron": "^3.0.3",
     "node-fetch": "^3.3.2",
-    "node-telegram-bot-api": "^0.67.0",
     "pdfkit": "^0.15.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "nodemon": "^3.1.11",
+    "puppeteer-core": "^25.11.0"
   }
 }

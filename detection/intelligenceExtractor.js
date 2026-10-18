@@ -143,11 +143,34 @@ function extractIntelligence(text) {
     };
 }
 
+/**
+ * Extract money amounts (₹ / Rs / INR) the scammer asks for. Kept separate from extractIntelligence()
+ * so the evaluator callback contract stays unchanged.
+ * @returns {Array<number>} amounts in rupees
+ */
+function extractAmounts(text) {
+    if (!text) return [];
+    const out = [];
+    const re = /(?:₹|rs\.?|inr)\s*([\d,]+(?:\.\d+)?)\s*(lakh|lac|crore|k)?|([\d,]+(?:\.\d+)?)\s*(?:rupees|rs\b)/gi;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+        let n = parseFloat((m[1] || m[3]).replace(/,/g, ''));
+        const unit = (m[2] || '').toLowerCase();
+        if (unit === 'k') n *= 1e3;
+        else if (unit === 'lakh' || unit === 'lac') n *= 1e5;
+        else if (unit === 'crore') n *= 1e7;
+        if (Number.isFinite(n) && n > 0) out.push(n);
+    }
+    return out;
+}
+
 module.exports = {
+    extractAmounts,
     extractUpiIds,
     extractPhoneNumbers,
     extractUrls,
     extractScamPhrases,
     identifyBehavioralPatterns,
-    extractIntelligence
+    extractIntelligence,
+    extractAll: extractIntelligence
 };

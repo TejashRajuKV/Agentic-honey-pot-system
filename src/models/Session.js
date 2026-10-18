@@ -103,7 +103,14 @@ const sessionSchema = new Schema({
     fsmScenario: {
         type: String,
         default: null
-    }
+    },
+    // Written by the message controller each turn (previously dropped: not in schema)
+    scamType: { type: String, default: null },
+    userVulnerability: { type: String, default: 'low' },
+    confidenceLocked: { type: Boolean, default: false },
+    // Agent safety governor (agent/replySafety.js)
+    safetyInterventions: { type: Number, default: 0 },
+    injectionAttempts: { type: Number, default: 0 }
 });
 
 module.exports = mongoose.model("Session", sessionSchema);

@@ -155,6 +155,62 @@ class ReportService {
             }
         }
 
+        // ── Investigator sections: evidence, kill chain, campaign, agent safety, provenance ──
+        const inv = await this._investigatorData(sessionId, data);
+
+        if (inv.risk && inv.risk.breakdown) {
+            doc.addPage();
+            doc.fontSize(18).fillColor('#000').text('Risk Breakdown (Why This Was Flagged)', { underline: true });
+            doc.moveDown();
+            doc.fontSize(11).text(`Fused risk score: ${inv.risk.riskScore}/100  |  Verdict: ${inv.risk.verdict}  |  Confidence: ${Math.round(inv.risk.confidence * 100)}%  |  Uncertainty: ${inv.risk.uncertainty}`);
+            doc.text(`Recommended action: ${inv.risk.recommendedAction}`);
+            doc.moveDown();
+            doc.fontSize(12).text('Signal contributions:');
+            doc.fontSize(10);
+            inv.risk.breakdown.forEach(b => doc.text(`• ${b.signal}: score ${b.score}, weight ${b.weight}, +${b.points} points`, { indent: 20 }));
+            doc.moveDown();
+            doc.fontSize(12).text('Evidence:');
+            doc.fontSize(9);
+            inv.risk.evidence.slice(0, 14).forEach(e => doc.text(`+${e.points}  [${e.type}] ${e.detail}`, { indent: 20 }));
+        }
+
+        if (inv.killChain) {
+            doc.addPage();
+            doc.fontSize(18).fillColor('#000').text('Scam Kill Chain & Tactic Timeline', { underline: true });
+            doc.moveDown();
+            doc.fontSize(11).text(`Peak stage reached: ${inv.killChain.peakStage} (${inv.killChain.stageProgress}% of the chain)`);
+            doc.text(`Pressure trend: ${inv.killChain.pressure.trend}  |  Tactic switches: ${inv.killChain.adaptation.tacticSwitches}  |  Adaptation score: ${inv.killChain.adaptation.score}/100`);
+            doc.moveDown();
+            doc.fontSize(9);
+            inv.killChain.timeline.forEach(t => {
+                doc.text(`#${t.turn} ${new Date(t.timestamp).toLocaleTimeString()}  ${t.stage}  [${t.tactics.join(', ') || 'no tactic tags'}]`, { indent: 10 });
+                doc.fillColor('#666').text(t.text, { indent: 30 }).fillColor('#000');
+            });
+        }
+
+        if (inv.campaign) {
+            doc.addPage();
+            doc.fontSize(18).fillColor('#000').text('Related Sessions & Campaign', { underline: true });
+            doc.moveDown();
+            doc.fontSize(11);
+            doc.text(`Campaign: ${inv.campaign.campaignId}  |  Sessions: ${inv.campaign.sessions}  |  Active days: ${inv.campaign.activeDays}`);
+            doc.text(`Identifiers: ${inv.campaign.identifierCount} (UPI ${inv.campaign.identifiers.upiIds.length}, phone ${inv.campaign.identifiers.phoneNumbers.length}, domains ${inv.campaign.identifiers.domains.length})`);
+            doc.text(`Related session ids: ${inv.campaign.sessionIds.join(', ')}`);
+            doc.moveDown();
+            doc.fontSize(9).fillColor('#666').text(inv.campaign.caveat).fillColor('#000');
+        }
+
+        doc.addPage();
+        doc.fontSize(18).fillColor('#000').text('Agent Safety & Provenance', { underline: true });
+        doc.moveDown();
+        doc.fontSize(11);
+        doc.text(`Safety governor interventions: ${inv.safety.interventions}  |  Prompt-injection attempts by the other party: ${inv.safety.injectionAttempts}`);
+        doc.moveDown();
+        doc.fontSize(9).fillColor('#666');
+        doc.text(`Detector: rule engine ${inv.provenance.ruleEngine}; risk fusion ${inv.provenance.fusionEngine}; ML engine ${inv.provenance.mlEngine}`);
+        doc.text(`Evidence timestamps are UTC; session created ${new Date(data.session.createdAt).toISOString()}, last active ${new Date(data.session.lastActiveAt).toISOString()}`);
+        doc.fillColor('#000');
+
         // Recommendations
         doc.addPage();
         doc.fontSize(18).text('Recommendations', { underline: true });
@@ -235,7 +291,8 @@ class ReportService {
                     velocity: data.profile.behavioralFingerprint.pressureVelocity
                 }
             } : null,
-            summary: this._createExecutiveSummary(data)
+            summary: this._createExecutiveSummary(data),
+            investigation: await this._investigatorData(sessionId, data)
         };
 
         return exportData;
@@ -331,6 +388,39 @@ class ReportService {
             patterns: Array.from(patterns),
             profile
         };
+    }
+
+
+    /**
+     * Extra sections for investigators: fused risk evidence, kill chain, campaign, agent safety, provenance.
+     * Every part is optional — a failure in one never blocks the report.
+     */
+    async _investigatorData(sessionId, data) {
+        const out = { risk: null, killChain: null, campaign: null, safety: { interventions: data.session.safetyInterventions || 0, injectionAttempts: data.session.injectionAttempts || 0 }, provenance: {} };
+        const attempt = async (fn) => { try { return await fn(); } catch (e) { return null; } };
+
+        out.killChain = await attempt(() => require('./killChainService').analyzeSession(sessionId));
+        out.risk = await attempt(() => {
+            const scammerText = data.turns.filter(t => t.role === 'user').map(t => t.text).join('\n').slice(0, 4000);
+            return require('./riskFusionService').assess({
+                message: scammerText,
+                upiIds: data.intelligence.upiIds,
+                phoneNumbers: data.intelligence.phoneNumbers,
+                url: data.intelligence.urls[0]
+            });
+        });
+        out.campaign = await attempt(async () => {
+            const list = await require('./campaignService').detectCampaigns({ minSessions: 1, limit: 200 });
+            return list.find(c => c.sessionIds.includes(sessionId)) || null;
+        });
+        const cfg = require('../config/riskWeights.json');
+        let mlVersion = 'unavailable';
+        try {
+            const r = await fetch(`${require('./mlProcessManager').ML_URL}/api/version`, { signal: AbortSignal.timeout(2000) });
+            if (r.ok) mlVersion = (await r.json()).version || 'unknown';
+        } catch { /* engine offline */ }
+        out.provenance = { ruleEngine: 'v2.1', fusionEngine: cfg.version, mlEngine: mlVersion };
+        return out;
     }
 
     /**

@@ -1,0 +1,738 @@
+/* ─────────────────────────────────────────
+   Forensic Design System
+ ───────────────────────────────────────── */
+
+/* ── Module Header ── */
+.module-header-technical {
+    margin-bottom: 48px;
+    border-left: 4px solid var(--cyan);
+    padding-left: 24px;
+    transition: border var(--transition);
+}
+
+.module-id-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+}
+
+.module-technical-title {
+    font-size: 32px;
+    font-weight: 950;
+    letter-spacing: -1.5px;
+    margin: 8px 0;
+    color: var(--white);
+    transition: color var(--transition);
+}
+
+.module-desc {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+}
+
+/* ── Technical Inputs ── */
+.forensic-input-group {
+    position: relative;
+    margin-bottom: 28px;
+}
+
+.forensic-label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    letter-spacing: 1.5px;
+}
+
+.input-bracket-wrap {
+    position: relative;
+}
+
+.input-bracket-wrap::before,
+.input-bracket-wrap::after {
+    content: '[';
+    position: absolute;
+    left: -14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--border);
+    font-family: var(--font-mono);
+    font-size: 24px;
+    opacity: 0.8;
+}
+
+.input-bracket-wrap::after {
+    content: ']';
+    left: auto;
+    right: -14px;
+}
+
+.forensic-input {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 16px 20px;
+    color: var(--white);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    outline: none;
+    transition: all var(--transition);
+}
+
+.forensic-input:focus {
+    border-color: var(--cyan);
+    background: var(--card2);
+    box-shadow: 0 0 20px rgba(0, 242, 255, 0.05);
+}
+
+/* ── Forensic Scan Button ── */
+.btn-forensic-scan {
+    width: 100%;
+    background: transparent;
+    border: 2px solid var(--cyan);
+    color: var(--cyan);
+    padding: 20px;
+    font-family: var(--font-mono);
+    font-weight: 900;
+    font-size: 15px;
+    letter-spacing: 5px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-forensic-scan::before {
+    content: '';
+    position: absolute;
+    top: -100%;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, transparent, rgba(0, 242, 255, 0.2), transparent);
+    animation: scan-loop 2.5s linear infinite;
+}
+
+@keyframes scan-loop {
+    0% {
+        top: -100%;
+    }
+
+    100% {
+        top: 100%;
+    }
+}
+
+.btn-forensic-scan:hover {
+    background: var(--cyan);
+    color: #000;
+    box-shadow: 0 0 60px rgba(0, 242, 255, 0.5), 0 0 120px rgba(0, 242, 255, 0.2);
+}
+
+.btn-forensic-scan:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    border-color: var(--muted);
+    color: var(--muted);
+}
+
+/* ── Result Dossier ── */
+.result-dossier {
+    margin-top: 48px;
+    background: linear-gradient(135deg, var(--card) 0%, var(--card2) 100%);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--cyan);
+    padding: 40px;
+    position: relative;
+    box-shadow:
+        10px 10px 30px rgba(0, 0, 0, 0.3),
+        0 0 1px rgba(0, 242, 255, 0.1) inset;
+    animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.result-dossier::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(45deg, transparent 50%, rgba(0, 242, 255, 0.05) 50%);
+    pointer-events: none;
+}
+
+.verdict-stamp-wrap {
+    position: absolute;
+    top: 72px;
+    right: 32px;
+}
+
+.verdict-stamp {
+    font-family: var(--font-mono);
+    font-size: 24px;
+    font-weight: 1000;
+    border: 4px solid;
+    padding: 10px 24px;
+    text-transform: uppercase;
+    transform: rotate(-10deg);
+    opacity: 0.9;
+}
+
+.stamp-anomaly {
+    color: var(--red);
+    border-color: var(--red);
+}
+
+.stamp-clear {
+    color: var(--green);
+    border-color: var(--green);
+}
+
+.dossier-line {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 0;
+    display: flex;
+    gap: 32px;
+}
+
+.dossier-label {
+    width: 140px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    align-self: flex-start;
+    padding-top: 4px;
+}
+
+.dossier-value {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.5;
+}
+
+/* ── Safety Tip Protocol Box ── */
+.safety-tip-container {
+    margin-top: 32px;
+    background: rgba(0, 242, 255, 0.03);
+    border: 1px dashed rgba(0, 242, 255, 0.2);
+    padding: 24px;
+    border-radius: 4px;
+}
+
+.safety-tip-header {
+    font-size: 10px;
+    color: var(--cyan);
+    margin-bottom: 12px;
+    letter-spacing: 2px;
+    font-weight: 700;
+}
+
+.safety-tip-body {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.6;
+    font-style: italic;
+    opacity: 0.9;
+}
+
+/* ── Demo Controls ── */
+.demo-controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 32px;
+}
+
+.btn-demo {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 10px 18px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+}
+
+.btn-demo:hover {
+    border-color: var(--cyan);
+    color: var(--white);
+    background: var(--card2);
+}
+
+/* ── Checklist Technical ── */
+.checklist-technical {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 32px;
+}
+
+.checklist-item-forensic {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 16px 24px;
+    display: grid;
+    grid-template-columns: 50px 1fr 80px;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.checklist-item-forensic:hover {
+    background: var(--card2);
+    border-color: var(--cyan);
+}
+
+.checklist-item-forensic.checked {
+    background: rgba(255, 61, 0, 0.05);
+    border-color: rgba(255, 61, 0, 0.4);
+}
+
+.check-box {
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 16px;
+}
+
+.checklist-item-forensic.checked .check-box {
+    color: var(--red);
+}
+
+.check-text {
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: var(--text);
+    font-family: var(--font-mono);
+}
+
+.check-score {
+    font-size: 12px;
+    text-align: right;
+    color: var(--muted);
+    font-family: var(--font-mono);
+}
+
+.checklist-item-forensic.checked .check-score {
+    color: var(--red);
+    font-weight: 700;
+}
+
+/* ── Behavior Grid ── */
+.behavior-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+/* ── Error Box ── */
+.error-box {
+    background: rgba(255, 61, 0, 0.05);
+    border: 1px solid var(--red);
+    color: var(--red);
+    padding: 20px;
+    margin: 24px 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+/* ── Neural Radar (Behavior Monitor) ── */
+.radar-container {
+    position: relative;
+    width: 320px;
+    height: 320px;
+    margin: 40px auto;
+    background: radial-gradient(circle, rgba(0, 242, 255, 0.05) 0%, transparent 70%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.radar-ringring {
+    position: absolute;
+    border: 1px solid rgba(0, 242, 255, 0.1);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    top: 50%;
+    left: 50%;
+}
+
+.ring-1 {
+    width: 100%;
+    height: 100%;
+}
+
+.ring-2 {
+    width: 66%;
+    height: 66%;
+}
+
+.ring-3 {
+    width: 33%;
+    height: 33%;
+}
+
+.radar-sweep {
+    position: absolute;
+    width: 50%;
+    height: 2px;
+    background: linear-gradient(to right, var(--cyan), transparent);
+    top: 50%;
+    left: 50%;
+    transform-origin: left center;
+    z-index: 2;
+}
+
+.radar-hub {
+    width: 12px;
+    height: 12px;
+    background: var(--cyan);
+    border-radius: 50%;
+    box-shadow: 0 0 15px var(--cyan);
+    z-index: 3;
+    position: relative;
+}
+
+.radar-node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transform: translate(-50%, -50%);
+}
+
+.node-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--muted);
+    border-radius: 50%;
+    transition: all 0.3s;
+}
+
+.radar-node.flagged .node-dot {
+    background: var(--red);
+    box-shadow: 0 0 10px var(--red);
+    transform: scale(1.5);
+}
+
+.node-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+}
+
+.radar-node.flagged .node-label {
+    color: var(--red);
+}
+
+/* ── Truth Gauge (Fake News) ── */
+.gauge-wrap {
+    margin: 40px auto;
+    text-align: center;
+}
+
+.gauge-svg-container {
+    margin-bottom: 16px;
+}
+
+.gauge-marker {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    fill: var(--muted);
+    letter-spacing: 1px;
+}
+
+.gauge-label {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.gauge-label span {
+    color: var(--white);
+    font-weight: 700;
+}
+
+/* ── Security Shield (Loan Risk) ── */
+.sentinel-wrap {
+    position: relative;
+    padding: 60px;
+    margin: 40px 0;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    min-height: 320px;
+}
+
+.heatmap-grid {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    grid-template-rows: repeat(10, 1fr);
+    opacity: 0.1;
+    pointer-events: none;
+}
+
+.grid-cell {
+    border: 0.5px solid var(--border);
+}
+
+.grid-cell.hot {
+    background: var(--red);
+    animation: pulse-red 2s infinite;
+}
+
+.sentinel-main {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    gap: 48px;
+    align-items: center;
+}
+
+.shield-viz {
+    width: 200px;
+    height: 200px;
+    position: relative;
+}
+
+.shield-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.shield-ring {
+    fill: none;
+    stroke: var(--cyan);
+    stroke-width: 1;
+    stroke-dasharray: 4 2;
+    opacity: 0.3;
+}
+
+.shield-core {
+    fill: var(--cyan);
+    opacity: 0.8;
+}
+
+.shield-core.broken {
+    fill: var(--red);
+    animation: flicker 0.5s infinite;
+}
+
+.integrity-val {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    font-size: 24px;
+    font-weight: 900;
+    color: var(--white);
+    font-family: var(--font-mono);
+}
+
+.integrity-val .sub {
+    display: block;
+    font-size: 8px;
+    color: var(--muted);
+    letter-spacing: 2px;
+}
+
+.metadata-ticker {
+    flex: 1;
+    height: 120px;
+    overflow: hidden;
+    font-size: 11px;
+    line-height: 1.8;
+}
+
+.ticker-line {
+    color: var(--muted);
+    font-family: var(--font-mono);
+}
+
+.ticker-line.err {
+    color: var(--red);
+}
+
+.ticker-line.ok {
+    color: var(--green);
+}
+
+@keyframes pulse-red {
+
+    0%,
+    100% {
+        opacity: 0.1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+}
+
+@keyframes flicker {
+
+    0%,
+    100% {
+        opacity: 0.8;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+}
+
+/* -- Flagged Signatures -- */
+.flagged-words {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.flagged-word {
+    background: rgba(255, 45, 85, 0.08);
+    color: var(--red);
+    padding: 6px 14px;
+    border: 1px solid rgba(255, 45, 85, 0.3);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* -- Confidence Bar Refinements -- */
+.confidence-wrap {
+    margin: 48px 0;
+    padding: 24px;
+    background: rgba(0, 242, 255, 0.03);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--cyan);
+    border-radius: 0 4px 4px 0;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.confidence-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    font-weight: 900;
+}
+
+.confidence-value {
+    font-size: 22px;
+    font-weight: 950;
+    color: var(--white);
+}
+
+.confidence-track {
+    height: 10px;
+    background: var(--surface);
+    border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--border);
+}
+
+.confidence-fill {
+    height: 100%;
+    border-radius: 5px;
+    box-shadow: 0 0 20px rgba(0, 242, 255, 0.3);
+    transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* -- Risk Timeline (Behavior Monitor) -- */
+.risk-timeline {
+    width: 320px;
+    margin-top: 24px;
+    background: rgba(0, 242, 255, 0.02);
+    border: 1px solid var(--border);
+    padding: 16px;
+    border-radius: 4px;
+    animation: fadeIn 0.5s ease;
+}
+
+.timeline-header {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--border);
+}
+
+.timeline-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.timeline-entry {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 4px 8px;
+    border-left: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.timeline-entry.extreme {
+    background: rgba(255, 61, 0, 0.05);
+    border-left-color: var(--red);
+}
+
+.timeline-entry .time {
+    color: var(--muted);
+    width: 45px;
+}
+
+.timeline-entry .separator {
+    color: var(--cyan);
+    opacity: 0.5;
+}
+
+.timeline-entry .verdict {
+    flex: 1;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.verdict.safe-risk, .verdict.safe {
+    color: var(--green);
+}
+
+.verdict.medium-risk, .verdict.medium {
+    color: var(--amber);
+}
+
+.verdict.high-risk, .verdict.high, .verdict.anomaly {
+    color: var(--red);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}

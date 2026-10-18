@@ -1,6 +1,7 @@
 // src/services/alertService.js
+const crypto = require('crypto');
 const AlertConfig = require('../models/AlertConfig');
-const fetch = require('node-fetch');
+// Uses Node's built-in fetch (node-fetch v3 is ESM-only and cannot be require()d)
 
 /**
  * Alert Service
@@ -44,6 +45,16 @@ class AlertService {
             return { sent: false, reason: 'trigger_not_enabled' };
         }
 
+        // Configured filters (minimum risk, scam-type allow-list)
+        const minRisk = config.filters?.minRiskScore || 0;
+        if (minRisk > 0 && typeof payload.riskScore === 'number' && payload.riskScore < minRisk) {
+            return { sent: false, reason: 'below_min_risk_score' };
+        }
+        const allowedTypes = config.filters?.scamTypes || [];
+        if (allowedTypes.length && payload.scamType && !allowedTypes.includes(payload.scamType)) {
+            return { sent: false, reason: 'scam_type_filtered' };
+        }
+
         // Check rate limits
         if (!this._checkRateLimit(config)) {
             return { sent: false, reason: 'rate_limit_exceeded' };
@@ -66,6 +77,11 @@ class AlertService {
                     const webhookResult = await this._sendWebhook(config, alertPayload);
                     results.channels.webhook = webhookResult;
                     results.sent = results.sent || webhookResult.success;
+                    config.stats.retries = (config.stats.retries || 0) + (webhookResult.retries || 0);
+                    if (webhookResult.latencyMs != null) {
+                        config.stats.latencySamples = [...(config.stats.latencySamples || []), webhookResult.latencyMs].slice(-50);
+                    }
+                    if (!webhookResult.success) config.stats.deadLetters = (config.stats.deadLetters || 0) + 1;
                 } else if (channel === 'log') {
                     this._logAlert(type, alertPayload);
                     results.channels.log = { success: true };
@@ -160,7 +176,9 @@ class AlertService {
      * Send webhook notification
      */
     async _sendWebhook(config, payload, retryCount = 0) {
+        const started = Date.now();
         try {
+            const body = JSON.stringify(payload);
             const headers = {
                 'Content-Type': 'application/json',
                 'User-Agent': 'Honeypot-Alert-System/1.0'
@@ -173,13 +191,19 @@ class AlertService {
                 headers[config.auth.headerName || 'X-API-Key'] = config.auth.token;
             } else if (config.auth.type === 'basic') {
                 headers['Authorization'] = `Basic ${Buffer.from(config.auth.token).toString('base64')}`;
+            } else if (config.auth.type === 'hmac' && config.auth.token) {
+                // Receiver verifies: HMAC-SHA256(secret, `${timestamp}.${rawBody}`) — replay-safe with a timestamp window
+                const timestamp = Math.floor(Date.now() / 1000).toString();
+                const signature = crypto.createHmac('sha256', config.auth.token).update(`${timestamp}.${body}`).digest('hex');
+                headers['X-CyberRakshak-Timestamp'] = timestamp;
+                headers['X-CyberRakshak-Signature'] = `sha256=${signature}`;
             }
 
             const response = await fetch(config.webhookUrl, {
                 method: 'POST',
                 headers,
-                body: JSON.stringify(payload),
-                timeout: 10000 // 10 second timeout
+                body,
+                signal: AbortSignal.timeout(10000)
             });
 
             if (!response.ok) {
@@ -189,6 +213,8 @@ class AlertService {
             return {
                 success: true,
                 statusCode: response.status,
+                latencyMs: Date.now() - started,
+                retries: retryCount,
                 timestamp: new Date()
             };
 
@@ -202,6 +228,7 @@ class AlertService {
             return {
                 success: false,
                 error: error.message,
+                latencyMs: Date.now() - started,
                 retries: retryCount
             };
         }
@@ -300,6 +327,21 @@ class AlertService {
                     }
                 };
 
+            case 'cross_session':
+                return {
+                    ...basePayload,
+                    alert: {
+                        severity: 'HIGH',
+                        title: 'Same Scammer Across Multiple Victims',
+                        message: `Incident ${data.incidentId} has now spread to ${data.sessions?.length || 2} sessions`,
+                        incidentId: data.incidentId,
+                        riskScore: data.riskScore,
+                        scamType: data.scamType,
+                        sessions: data.sessions,
+                        identifiers: data.identifiers
+                    }
+                };
+
             case 'multiple_victims':
                 return {
                     ...basePayload,
@@ -393,6 +435,10 @@ class AlertService {
                     headers['Authorization'] = `Bearer ${authConfig.token}`;
                 } else if (authConfig.type === 'api_key') {
                     headers[authConfig.headerName || 'X-API-Key'] = authConfig.token;
+                } else if (authConfig.type === 'hmac' && authConfig.token) {
+                    const timestamp = Math.floor(Date.now() / 1000).toString();
+                    headers['X-CyberRakshak-Timestamp'] = timestamp;
+                    headers['X-CyberRakshak-Signature'] = `sha256=${crypto.createHmac('sha256', authConfig.token).update(`${timestamp}.${JSON.stringify(testPayload)}`).digest('hex')}`;
                 }
             }
 
@@ -461,6 +507,14 @@ class AlertService {
             total: stats.totalAlertsSent,
             successful: stats.successfulDeliveries,
             failed: stats.failedDeliveries,
+            retries: stats.retries || 0,
+            deadLetters: stats.deadLetters || 0,
+            latency: (() => {
+                const v = [...(stats.latencySamples || [])].sort((a, b) => a - b);
+                if (!v.length) return null;
+                const pick = (p) => v[Math.min(v.length - 1, Math.ceil(p * v.length) - 1)];
+                return { samples: v.length, avgMs: Math.round(v.reduce((a, b) => a + b, 0) / v.length), p50Ms: pick(0.5), p95Ms: pick(0.95) };
+            })(),
             successRate: parseFloat(successRate),
             avgAlertsPerDay: parseFloat(avgAlertsPerDay),
             lastAlert: stats.lastAlertSent,

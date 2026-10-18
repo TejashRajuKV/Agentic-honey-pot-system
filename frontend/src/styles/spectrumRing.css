@@ -1,0 +1,32 @@
+/* ── Shared Spectrum Ring core — used by the hero corner accent and the
+   small "Threat Vector Analysis" header ring ── */
+.spectrum-ring-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.spectrum-ring-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg); /* segments start drawing from 12 o'clock */
+}
+
+.spectrum-ring-svg .ring-segment {
+    transition: opacity 0.2s ease;
+}
+
+.spectrum-ring-svg .ring-center-dot {
+    fill: var(--cyan);
+    opacity: 0.85;
+    animation: pulse 2.4s ease infinite;
+}
+
+.spectrum-ring-svg.is-spinning {
+    animation: spectrumRingSpin 26s linear infinite;
+}
+
+@keyframes spectrumRingSpin {
+    from { transform: rotate(-90deg); }
+    to   { transform: rotate(270deg); }
+}

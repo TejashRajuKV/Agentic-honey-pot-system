@@ -1,0 +1,15 @@
+{
+  "version": "fusion-1.0",
+  "note": "Starting weights, not learned values. Re-fit them against labelled cases before relying on the absolute numbers. Override at runtime with the RISK_WEIGHTS env var (JSON).",
+  "weights": {
+    "message": 0.28,
+    "url": 0.20,
+    "app": 0.10,
+    "behavior": 0.12,
+    "intel": 0.15,
+    "identity": 0.08,
+    "history": 0.07
+  },
+  "peakBlend": 0.35,
+  "verdicts": { "HIGH_RISK": 80, "SUSPICIOUS": 50, "LOW_RISK": 25 }
+}

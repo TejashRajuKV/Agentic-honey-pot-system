@@ -2,12 +2,29 @@
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const path = require("path");
+const fs = require("fs");
 require("dotenv").config();
 
-const app = express();
+const FRONTEND_DIST = path.join(__dirname, "..", "frontend", "dist");
+const HAS_FRONTEND = fs.existsSync(path.join(FRONTEND_DIST, "index.html"));
 
-// Middleware
-app.use(cors());
+const app = express();
+app.disable("x-powered-by");   // don't advertise the framework
+
+// Middleware — allow both the GUVI evaluator and the CyberRakshak React frontend
+const ALLOWED_ORIGINS = [
+    "http://localhost:5173",  // CyberRakshak Vite dev server
+    "http://localhost:3000",  // self / any local tool
+];
+app.use(cors({
+    origin: (origin, cb) => {
+        // Allow requests with no origin (e.g. curl, Postman, server-to-server)
+        if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+        return cb(null, true); // Open for evaluation platform (any origin)
+    },
+    credentials: false,
+}));
 
 // Parse JSON with any content-type (GUVI tester may not send Content-Type header)
 app.use(express.json({ type: '*/*' }));
@@ -22,7 +39,9 @@ app.use((req, res, next) => {
 
 // ✅ Health check routes — NO AUTH REQUIRED
 // These must be registered BEFORE the authenticated API routes
-app.get("/", (req, res) => {
+app.get("/", (req, res, next) => {
+    // Browsers get the web console (when built); evaluators / curl keep the JSON health probe
+    if (HAS_FRONTEND && req.accepts(["json", "html"]) === "html") return next();
     res.json({
         status: "ok",
         message: "Agentic Honey-Pot Backend is running 🐝",
@@ -66,5 +85,42 @@ app.use("/api/v1/alerts", alertsRoutes);
 app.use("/api/v1/quality", qualityRoutes);
 app.use("/api/v1/reports", reportsRoutes);
 app.use("/api/v1/language", languageRoutes);
+
+// ── System status + first-party web-console API ───────────────────────────
+app.use("/api/v1/system", require("./routes/system"));
+app.use("/api/v1/console", require("./routes/console"));
+
+// ── CyberRakshak ML engine gateway: /api/v1/ml/<module> → ml/ Flask /api/<module> ──
+app.use("/api/v1/ml", require("./routes/ml"));
+
+// Unknown API paths get JSON 404s (never the SPA shell)
+app.use("/api", (req, res) => {
+    res.status(404).json({ status: "error", message: `No such API route: ${req.method} ${req.originalUrl}` });
+});
+
+// ── Web console (React build) — one server, one origin, one port ──────────
+if (HAS_FRONTEND) {
+    app.use(express.static(FRONTEND_DIST));
+    // SPA fallback so client-side routes (/dashboard …) survive a hard refresh
+    app.get(/^\/(?!api\/).*/, (req, res) => res.sendFile(path.join(FRONTEND_DIST, "index.html")));
+    console.log(`🖥️  Serving web console from ${FRONTEND_DIST}`);
+} else {
+    console.log("ℹ️  frontend/dist not found — run `npm run build` (or `npm run dev` for the Vite dev server)");
+}
+
+// ── Error handling: the API always answers in JSON and never leaks internals ─────────
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    const status = err.status || err.statusCode || 500;
+    if (err.type === "entity.parse.failed") {
+        return res.status(400).json({ status: "error", message: "Request body is not valid JSON" });
+    }
+    if (err.type === "entity.too.large") {
+        return res.status(413).json({ status: "error", message: "Request body is too large" });
+    }
+    if (status >= 500) console.error("Unhandled request error:", err.message);
+    return res.status(status).json({ status: "error", message: status >= 500 ? "Internal server error" : err.message });
+});
 
 module.exports = app;

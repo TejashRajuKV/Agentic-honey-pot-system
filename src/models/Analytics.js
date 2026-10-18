@@ -89,9 +89,8 @@ const analyticsSchema = new Schema({
 analyticsSchema.index({ date: -1 });
 
 // Update timestamp on save
-analyticsSchema.pre('save', function (next) {
+analyticsSchema.pre('save', function () {
     this.updatedAt = Date.now();
-    next();
 });
 
 module.exports = mongoose.model("Analytics", analyticsSchema);

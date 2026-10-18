@@ -1,0 +1,465 @@
+/* ─────────────────────────────────────────
+   Guardian Link + Dark Web Pulse Styles
+ ───────────────────────────────────────── */
+
+/* ── Guardian Setup (Sidebar) ── */
+.guardian-setup-wrap {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+}
+
+.guardian-section-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.g-icon {
+    font-size: 12px;
+}
+
+.guardian-active-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 255, 136, 0.05);
+    border: 1px solid rgba(0, 255, 136, 0.2);
+    padding: 10px 14px;
+    margin-bottom: 8px;
+}
+
+.g-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.g-status-dot.online {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+}
+
+.g-info {
+    flex: 1;
+}
+
+.g-name {
+    font-size: 11px;
+    color: var(--white);
+    font-weight: 700;
+}
+
+.g-email {
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 2px;
+}
+
+.g-edit-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 10px;
+    font-size: 9px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+}
+
+.g-edit-btn:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+}
+
+.guardian-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.g-input {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--white);
+    padding: 8px 12px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    outline: none;
+    transition: border 0.2s;
+}
+
+.g-input:focus {
+    border-color: var(--cyan);
+}
+
+.g-input::placeholder {
+    color: var(--muted);
+}
+
+.g-btn-row {
+    display: flex;
+    gap: 8px;
+}
+
+.g-save-btn {
+    flex: 1;
+    background: var(--green);
+    color: #000;
+    border: none;
+    padding: 8px;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.g-save-btn:hover {
+    opacity: 0.85;
+}
+
+.g-cancel-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 12px;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.g-cancel-btn:hover {
+    border-color: var(--red);
+    color: var(--red);
+}
+
+.g-hint {
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 8px;
+    opacity: 0.6;
+    letter-spacing: 1px;
+}
+
+/* ── Guardian Alert Modal ── */
+.guardian-alert-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease;
+}
+
+.guardian-alert-panel {
+    background: var(--surface);
+    border: 2px solid var(--green);
+    max-width: 520px;
+    width: 90%;
+    box-shadow: 0 0 80px rgba(0, 255, 136, 0.2), 0 0 160px rgba(0, 255, 136, 0.05);
+    animation: fadeUp 0.3s ease;
+}
+
+.ga-header {
+    background: rgba(0, 255, 136, 0.06);
+    border-bottom: 1px solid rgba(0, 255, 136, 0.2);
+    padding: 24px 28px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.ga-icon-wrap {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ga-icon {
+    font-size: 28px;
+}
+
+.ga-pulse-ring {
+    position: absolute;
+    inset: -4px;
+    border: 2px solid var(--green);
+    border-radius: 50%;
+    animation: glowPulse 1.5s ease infinite;
+}
+
+.ga-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--green);
+    letter-spacing: 2px;
+}
+
+.ga-subtitle {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 1px;
+}
+
+.ga-body {
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.ga-row {
+    display: flex;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+}
+
+.ga-label {
+    width: 120px;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    flex-shrink: 0;
+}
+
+.ga-value {
+    font-size: 11px;
+    color: var(--white);
+    letter-spacing: 1px;
+}
+
+.ga-demo-note {
+    background: rgba(255, 149, 0, 0.08);
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    color: var(--amber);
+    font-size: 10px;
+    padding: 10px 14px;
+    letter-spacing: 1px;
+}
+
+.ga-email-sent {
+    background: rgba(0, 255, 136, 0.06);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    color: var(--green);
+    font-size: 10px;
+    padding: 10px 14px;
+    letter-spacing: 1px;
+}
+
+.ga-dismiss {
+    width: 100%;
+    background: transparent;
+    border-top: 1px solid var(--border);
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    color: var(--green);
+    padding: 18px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ga-dismiss:hover {
+    background: rgba(0, 255, 136, 0.05);
+}
+
+/* ── Dark Web Pulse ── */
+.dwp-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 32px;
+    margin-top: 40px;
+}
+
+.dwp-header {
+    margin-bottom: 24px;
+}
+
+.dwp-title {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    color: var(--white);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.dwp-icon {
+    font-size: 16px;
+}
+
+.dwp-desc {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+}
+
+.dwp-input-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.dwp-scan-btn {
+    background: transparent;
+    border: 2px solid var(--red);
+    color: var(--red);
+    padding: 0 24px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.dwp-scan-btn:hover:not(:disabled) {
+    background: var(--red);
+    color: #000;
+    box-shadow: 0 0 30px rgba(255, 61, 0, 0.4);
+}
+
+.dwp-scan-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.dwp-error {
+    font-size: 10px;
+    color: var(--red);
+    padding: 8px 0;
+    letter-spacing: 1px;
+}
+
+.dwp-result {
+    margin-top: 20px;
+}
+
+.dwp-verdict {
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    font-family: var(--font-mono);
+}
+
+.dwp-verdict.breach-found {
+    background: rgba(255, 61, 0, 0.08);
+    border: 2px solid var(--red);
+    color: var(--red);
+}
+
+.dwp-verdict.clean {
+    background: rgba(0, 255, 136, 0.06);
+    border: 2px solid var(--green);
+    color: var(--green);
+}
+
+.dwp-demo-tag {
+    font-size: 9px;
+    opacity: 0.6;
+}
+
+.dwp-risk-note {
+    font-size: 11px;
+    color: var(--amber);
+    background: rgba(255, 149, 0, 0.06);
+    border-left: 3px solid var(--amber);
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    letter-spacing: 0.5px;
+    line-height: 1.7;
+}
+
+.dwp-breach-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.dwp-breach-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--card2);
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s;
+}
+
+.dwp-breach-row:hover {
+    background: rgba(255, 61, 0, 0.04);
+}
+
+.dwp-breach-left {
+    flex: 1;
+}
+
+.dwp-breach-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.dwp-breach-name {
+    font-size: 12px;
+    color: var(--white);
+    font-weight: 700;
+}
+
+.dwp-breach-type {
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+}
+
+.dwp-breach-year {
+    font-size: 10px;
+    color: var(--muted);
+}
+
+.dwp-breach-records {
+    font-size: 10px;
+    color: var(--muted);
+}
+
+.dwp-severity {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    min-width: 60px;
+    text-align: right;
+}
+
+.dwp-advice {
+    margin-top: 16px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    line-height: 1.8;
+}

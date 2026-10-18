@@ -46,25 +46,40 @@ class AnalyticsService {
                 phaseDist[session.highestPhase]++;
             }
 
-            // Note: scamType would come from conversation turns analysis
-            // For now, we'll extract from patterns if available
+            if (session.scamEverDetected && session.scamType) {
+                scamTypeCounts[session.scamType] = (scamTypeCounts[session.scamType] || 0) + 1;
+            }
         }
 
-        // Get all conversation turns for pattern analysis
-        const turns = await ConversationTurn.find({
-            createdAt: { $gte: startOfDay, $lte: endOfDay }
+        // Language mix: classify each session by what the scammer wrote
+        const languageService = require('./languageService');
+        const scammerTurns = await ConversationTurn.find({
+            timestamp: { $gte: startOfDay, $lte: endOfDay },
+            role: 'user'
         });
+        const textBySession = new Map();
+        for (const t of scammerTurns) {
+            textBySession.set(t.sessionId, `${textBySession.get(t.sessionId) || ''} ${t.text}`);
+        }
+        for (const text of textBySession.values()) {
+            const lang = languageService.detectLanguage(text).language;
+            langBreakdown[lang in langBreakdown ? lang : 'other']++;
+        }
 
+        // Pattern trends: scam phrases and behavioural tactics extracted from the scammer's messages
+        const confidenceBySession = new Map(sessions.map(x => [x.sessionId, (x.maxScamProbability || 0) / 100]));
         const patternFrequency = {};
-        for (const turn of turns) {
-            if (turn.metadata?.detectedPatterns) {
-                for (const pattern of turn.metadata.detectedPatterns) {
-                    if (!patternFrequency[pattern]) {
-                        patternFrequency[pattern] = { count: 0, totalConf: 0 };
-                    }
-                    patternFrequency[pattern].count++;
-                    patternFrequency[pattern].totalConf += turn.metadata.scamProbability || 0;
+        for (const turn of scammerTurns) {
+            const patterns = [
+                ...(turn.extractedIntel?.scamPhrases || []),
+                ...(turn.extractedIntel?.behavioralPatterns || [])
+            ];
+            for (const pattern of patterns) {
+                if (!patternFrequency[pattern]) {
+                    patternFrequency[pattern] = { count: 0, totalConf: 0 };
                 }
+                patternFrequency[pattern].count++;
+                patternFrequency[pattern].totalConf += confidenceBySession.get(turn.sessionId) || 0;
             }
         }
 
@@ -288,7 +303,7 @@ class AnalyticsService {
                 knownScammers: a.threatSummary.knownScammers
             }));
 
-            const headers = Object.keys(rows[0]).join(',');
+            const headers = ['date', 'totalSessions', 'scamsDetected', 'avgConfidence', 'avgQuality', 'newScammers', 'knownScammers'].join(',');
             const csvRows = rows.map(r => Object.values(r).join(','));
             return [headers, ...csvRows].join('\n');
         }

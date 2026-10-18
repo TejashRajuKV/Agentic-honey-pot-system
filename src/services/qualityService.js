@@ -183,7 +183,7 @@ class QualityService {
 
         // Repetition check
         const history = context.conversationHistory || [];
-        const agentMessages = history.filter(h => h.role === 'assistant').map(h => h.text);
+        const agentMessages = history.filter(h => h.role === 'agent').map(h => h.text);
 
         if (agentMessages.some(m => m === message)) {
             flags.push({ type: 'repetitive', severity: 'high', description: 'Exact message repeated' });
@@ -291,7 +291,7 @@ class QualityService {
      * Detect repetition in conversation
      */
     async detectRepetition(sessionId) {
-        const turns = await ConversationTurn.find({ sessionId, role: 'assistant' }).sort({ timestamp: 1 });
+        const turns = await ConversationTurn.find({ sessionId, role: 'agent' }).sort({ timestamp: 1 });
 
         const repetitions = [];
         const seen = new Map();

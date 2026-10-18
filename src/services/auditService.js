@@ -159,7 +159,7 @@ async function getSessionAudit(sessionId) {
  */
 async function getAuditStats() {
     try {
-        const totalSessions = await AuditLog.distinct('sessionId').countDocuments();
+        const totalSessions = (await AuditLog.distinct('sessionId')).length;
         const scamsDetected = await AuditLog.countDocuments({ eventType: 'SCAM_DETECTED' });
         const baitsDeployed = await AuditLog.countDocuments({ eventType: 'BAIT_DEPLOYED' });
         const repeatScammers = await AuditLog.countDocuments({ eventType: 'REPEAT_SCAMMER_DETECTED' });

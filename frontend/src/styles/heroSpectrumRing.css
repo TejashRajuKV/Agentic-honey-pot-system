@@ -1,0 +1,36 @@
+/* ── Hero Spectrum Ring — HUD accent, on-brand take on the
+   animejs.com rainbow ring: color-coded arc segments instead of a
+   literal rainbow, drawn in on load, then left slowly spinning.
+   Shared ring visuals live in spectrumRing.css. ── */
+.hero-spectrum-ring {
+    position: absolute;
+    top: 40px;
+    right: 40px;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.hero-spectrum-ring::before {
+    content: '';
+    position: absolute;
+    inset: -14px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.32);
+    backdrop-filter: blur(6px);
+}
+
+.hero-spectrum-ring .spectrum-ring-svg {
+    position: relative;
+    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.35));
+}
+
+@media (max-width: 780px) {
+    .hero-spectrum-ring {
+        top: 24px;
+        right: 24px;
+    }
+    .hero-spectrum-ring .spectrum-ring-wrap {
+        width: 76px !important;
+        height: 76px !important;
+    }
+}

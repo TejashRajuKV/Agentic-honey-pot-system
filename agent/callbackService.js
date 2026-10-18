@@ -6,8 +6,18 @@
  * MANDATORY for hackathon evaluation
  */
 
-// GUVI Evaluation Endpoint (hardcoded as required)
-const GUVI_CALLBACK_URL = "https://hackathon.guvi.in/api/updateHoneyPotFinalResult";
+// GUVI evaluation endpoint — the default the hackathon requires. Setting EVALUATION_CALLBACK_URL
+// overrides it (staging, testing, or a different evaluator); leave it empty in production.
+const GUVI_DEFAULT_CALLBACK_URL = "https://hackathon.guvi.in/api/updateHoneyPotFinalResult";
+
+/** The URL final reports are POSTed to, and where that choice came from. */
+function getCallbackTarget() {
+    const custom = (process.env.EVALUATION_CALLBACK_URL || "").trim();
+    const url = custom || GUVI_DEFAULT_CALLBACK_URL;
+    let host = url;
+    try { host = new URL(url).host; } catch { /* keep raw */ }
+    return { url, host, source: custom ? "env" : "default" };
+}
 
 /**
  * Send final callback to GUVI evaluation endpoint
@@ -37,13 +47,13 @@ async function sendFinalCallback(sessionId, intelligence, sessionData) {
         agentNotes: generateAgentNotes(intelligence, sessionData)
     };
 
-    console.log('📤 Sending final result to GUVI evaluation endpoint...');
+    console.log(`📤 Sending final result to evaluation endpoint (${getCallbackTarget().host})...`);
     console.log('📊 Payload:', JSON.stringify(payload, null, 2));
 
     try {
         const fetch = (await import('node-fetch')).default;
 
-        const response = await fetch(GUVI_CALLBACK_URL, {
+        const response = await fetch(getCallbackTarget().url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -167,5 +177,6 @@ function formatIntelligenceReport(sessionId, intelligence) {
 
 module.exports = {
     sendFinalCallback,
+    getCallbackTarget,
     formatIntelligenceReport
 };

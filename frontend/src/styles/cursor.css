@@ -1,0 +1,48 @@
+/* ─────────────────────────────────────────
+   Custom Cursor — dot + lagging ring
+ ───────────────────────────────────────── */
+
+@media (pointer: fine) {
+    * { cursor: none !important; }
+}
+
+.custom-cursor-dot,
+.custom-cursor-ring {
+    position: fixed;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 99999;
+    border-radius: 50%;
+    will-change: transform;
+    transition: opacity 0.2s ease, width 0.25s ease, height 0.25s ease, background 0.25s ease;
+}
+
+.custom-cursor-dot {
+    width: 6px;
+    height: 6px;
+    margin: -3px 0 0 -3px;
+    background: var(--cyan, #00f2ff);
+    box-shadow: 0 0 8px var(--cyan, #00f2ff);
+}
+
+.custom-cursor-ring {
+    width: 34px;
+    height: 34px;
+    margin: -17px 0 0 -17px;
+    border: 1.5px solid rgba(0, 242, 255, 0.5);
+    background: rgba(0, 242, 255, 0.04);
+}
+
+.custom-cursor-ring.is-hover {
+    width: 56px;
+    height: 56px;
+    margin: -28px 0 0 -28px;
+    background: rgba(0, 242, 255, 0.1);
+    border-color: var(--cyan, #00f2ff);
+}
+
+.custom-cursor-dot.is-hidden,
+.custom-cursor-ring.is-hidden {
+    opacity: 0;
+}
