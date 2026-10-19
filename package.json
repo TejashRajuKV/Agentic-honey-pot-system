@@ -14,7 +14,8 @@
     "test:readiness": "node tests/readiness/run.js",
     "test:threat-network": "node tests/threat-network-correlation.js",
     "test:webhook-policy": "node tests/webhook-url-policy.js",
-    "test:rate-limit": "node tests/rate-limit.js"
+    "test:rate-limit": "node tests/rate-limit.js",
+    "test:console-auth": "node tests/console-auth.js"
   },
   "keywords": [
     "honeypot",
