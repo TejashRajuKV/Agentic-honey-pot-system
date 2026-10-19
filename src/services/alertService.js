@@ -1,6 +1,7 @@
 // src/services/alertService.js
 const crypto = require('crypto');
 const AlertConfig = require('../models/AlertConfig');
+const { validateWebhookUrl } = require('../utils/webhookUrlPolicy');
 // Uses Node's built-in fetch (node-fetch v3 is ESM-only and cannot be require()d)
 
 /**
@@ -178,6 +179,7 @@ class AlertService {
     async _sendWebhook(config, payload, retryCount = 0) {
         const started = Date.now();
         try {
+            await validateWebhookUrl(config.webhookUrl);
             const body = JSON.stringify(payload);
             const headers = {
                 'Content-Type': 'application/json',
@@ -203,7 +205,9 @@ class AlertService {
                 method: 'POST',
                 headers,
                 body,
-                signal: AbortSignal.timeout(10000)
+                signal: AbortSignal.timeout(10000),
+                // Never follow redirects: a public endpoint must not redirect the server to a private address.
+                redirect: 'manual'
             });
 
             if (!response.ok) {
@@ -426,6 +430,7 @@ class AlertService {
         };
 
         try {
+            await validateWebhookUrl(webhookUrl);
             const headers = {
                 'Content-Type': 'application/json'
             };
@@ -446,7 +451,8 @@ class AlertService {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(testPayload),
-                timeout: 5000
+                signal: AbortSignal.timeout(5000),
+                redirect: 'manual'
             });
 
             return {
