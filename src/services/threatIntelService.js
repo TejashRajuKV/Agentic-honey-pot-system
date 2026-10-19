@@ -323,6 +323,13 @@ class ThreatIntelligenceService {
         );
         shared.push(...sharedPhone.map(num => ({ type: 'phone', value: num })));
 
+        // URLs are collected by the pipeline too; include them in correlation so
+        // shared domains and phishing links are not silently omitted from the graph.
+        const urls1 = profile1.identifiers?.urls || [];
+        const urls2 = profile2.identifiers?.urls || [];
+        const sharedUrls = urls1.filter(url => urls2.includes(url));
+        shared.push(...sharedUrls.map(url => ({ type: 'url', value: url })));
+
         return shared;
     }
 
