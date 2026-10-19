@@ -45,16 +45,15 @@ router.put('/config', async (req, res) => {
 
         let config = await AlertConfig.findOne();
 
+        // The UI receives a masked token; preserve the stored secret when it sends that mask back.
+        if (updates.auth?.token === '••••••••') {
+            updates.auth = { ...updates.auth, token: config?.auth?.token || '' };
+        }
+
         if (!config) {
             config = new AlertConfig(updates);
         } else {
             Object.assign(config, updates);
-        }
-
-        // The UI receives a masked token; preserve the stored secret when it sends that mask back.
-        if (updates.auth?.token === '••••••••') {
-            updates.auth = { ...updates.auth, token: config.auth?.token || '' };
-            Object.assign(config, { auth: updates.auth });
         }
 
         await config.save();
