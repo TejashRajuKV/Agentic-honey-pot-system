@@ -1,6 +1,8 @@
 // src/routes/auth.js
 const express = require("express");
-const { createSessionToken, safeEqual, setSessionCookie, clearSessionCookie, configured } = require("../middleware/consoleAuth");
+const { createSessionToken, safeEqual, setSessionCookie, clearSessionCookie, configured, verifySessionToken } = require("../middleware/consoleAuth");
+const { createRateLimiter } = require("../middleware/rateLimit");
+const loginRateLimit = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 10 });
 
 const router = express.Router();
 
@@ -21,12 +23,11 @@ router.get("/session", (req, res) => {
         .map((part) => part.trim())
         .find((part) => part.startsWith("cyberrakshak_console="))
         ?.slice("cyberrakshak_console=".length);
-    const { verifySessionToken } = require("../middleware/consoleAuth");
     const authenticated = verifySessionToken(token);
     return res.json({ status: "success", authenticated, authEnabled: true });
 });
 
-router.post("/login", (req, res) => {
+router.post("/login", loginRateLimit, (req, res) => {
     if (!configured()) {
         if (process.env.NODE_ENV === "production") return unavailable(res);
         return res.json({ status: "success", authenticated: true, authEnabled: false });
