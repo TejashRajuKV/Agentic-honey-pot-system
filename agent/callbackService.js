@@ -47,8 +47,7 @@ async function sendFinalCallback(sessionId, intelligence, sessionData) {
         agentNotes: generateAgentNotes(intelligence, sessionData)
     };
 
-    console.log(`📤 Sending final result to evaluation endpoint (${getCallbackTarget().host})...`);
-    console.log('📊 Payload:', JSON.stringify(payload, null, 2));
+    // Do not log the extracted identifiers or full report payload; it can contain PII.
 
     try {
         const fetch = (await import('node-fetch')).default;
@@ -60,7 +59,7 @@ async function sendFinalCallback(sessionId, intelligence, sessionData) {
                 'User-Agent': 'Honeypot-Backend/1.0'
             },
             body: JSON.stringify(payload),
-            timeout: 15000 // 15 second timeout
+            signal: AbortSignal.timeout(15000) // applies to the request and response body
         });
 
         if (!response.ok) {

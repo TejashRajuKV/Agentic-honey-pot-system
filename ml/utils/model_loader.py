@@ -53,26 +53,39 @@ def load_models() -> dict:
 
     # ── Fake News ──
     if os.path.exists(FAKE_NEWS_MODEL_PATH) and os.path.exists(FAKE_NEWS_VECTORIZER_PATH):
-        _models["news_model"]  = joblib.load(FAKE_NEWS_MODEL_PATH)
-        _models["news_vec"]    = joblib.load(FAKE_NEWS_VECTORIZER_PATH)
-        print("  ✓ Fake news model loaded")
+        try:
+            _models["news_model"] = joblib.load(FAKE_NEWS_MODEL_PATH)
+            _models["news_vec"] = joblib.load(FAKE_NEWS_VECTORIZER_PATH)
+            print("  ✓ Fake news model loaded")
+        except Exception as e:
+            _models["news_model"] = None
+            _models["news_vec"] = None
+            print(f"  ✗ ERROR loading Fake News model: {e}")
     else:
-        _models["news_model"]  = None
-        _models["news_vec"]    = None
+        _models["news_model"] = None
+        _models["news_vec"] = None
         print("  ✗ Fake news model NOT found — run training/train_fakenews.py")
 
     # ── Behavior Monitor ──
     if os.path.exists(BEHAVIOR_MODEL_PATH):
-        _models["behavior_model"] = joblib.load(BEHAVIOR_MODEL_PATH)
-        print("  ✓ Behavior model loaded")
+        try:
+            _models["behavior_model"] = joblib.load(BEHAVIOR_MODEL_PATH)
+            print("  ✓ Behavior model loaded")
+        except Exception as e:
+            _models["behavior_model"] = None
+            print(f"  ✗ ERROR loading Behavior model: {e}")
     else:
         _models["behavior_model"] = None
         print("  ✗ Behavior model NOT found — run training/train_behavior.py")
 
     # ── Phishing Detector ──
     if os.path.exists(PHISHING_MODEL_PATH):
-        _models["phishing_model"] = joblib.load(PHISHING_MODEL_PATH)
-        print("  ✓ Phishing model loaded")
+        try:
+            _models["phishing_model"] = joblib.load(PHISHING_MODEL_PATH)
+            print("  ✓ Phishing model loaded")
+        except Exception as e:
+            _models["phishing_model"] = None
+            print(f"  ✗ ERROR loading Phishing model: {e}")
     else:
         _models["phishing_model"] = None
         print("  ✗ Phishing model NOT found — run training/train_phishing.py")

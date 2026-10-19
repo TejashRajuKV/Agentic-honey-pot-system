@@ -13,21 +13,32 @@ const app = express();
 app.disable("x-powered-by");   // don't advertise the framework
 
 // Middleware — allow both the GUVI evaluator and the CyberRakshak React frontend
-const ALLOWED_ORIGINS = [
-    "http://localhost:5173",  // CyberRakshak Vite dev server
-    "http://localhost:3000",  // self / any local tool
+// Same-origin production requests do not need CORS. For Vite development or a
+// separately hosted console, explicitly list trusted origins in ALLOWED_ORIGINS.
+// Never reflect arbitrary origins: CORS is not authentication, but wildcard access
+// makes it easier for an untrusted website to interact with a user's browser.
+const DEFAULT_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
 ];
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.join(","))
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 app.use(cors({
     origin: (origin, cb) => {
-        // Allow requests with no origin (e.g. curl, Postman, server-to-server)
+        // Requests without Origin are server-to-server / CLI clients and are not
+        // protected by CORS; sensitive routes still require their own auth.
         if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-        return cb(null, true); // Open for evaluation platform (any origin)
+        const error = new Error("Origin not allowed by CORS");
+        error.status = 403;
+        return cb(error);
     },
     credentials: false,
 }));
 
 // Parse JSON with any content-type (GUVI tester may not send Content-Type header)
-app.use(express.json({ type: '*/*' }));
+app.use(express.json({ type: '*/*', limit: process.env.JSON_BODY_LIMIT || '1mb' }));
 
 // Fallback: ensure req.body is always an object even if parsing fails
 app.use((req, res, next) => {

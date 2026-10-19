@@ -4,54 +4,47 @@ from utils.model_loader import models_status
 health_bp = Blueprint("health", __name__)
 
 
-# ─────────────────────────────────────────
-# GET /api/health
-# ─────────────────────────────────────────
 @health_bp.route("/api/health", methods=["GET"])
 def health_check():
-    """
-    System health check.
-    Shows which models are loaded and ready.
+    """Return explicit readiness for each ML module.
+
+    The gateway uses this endpoint for diagnostics. A missing optional model must
+    be visible as partial readiness instead of being silently reported as loaded.
     """
     status = models_status()
-
-    all_loaded = all(status.values())
+    core_models = ("scam_radar", "behavior_monitor", "fake_news", "phishing_detector")
+    all_loaded = all(status.get(name, False) for name in core_models)
 
     return jsonify({
-        "status":        "ok" if all_loaded else "partial",
+        "status": "ok" if all_loaded else "partial",
         "models_loaded": all_loaded,
         "modules": {
-            "scam_radar":       status.get("scam_radar",       False),
-            "behavior_monitor": status.get("behavior_monitor", False),
-            "fake_news":        status.get("fake_news",        False),
-            "loan_scorer":      status.get("loan_scorer",      True)
-        }
+            "scam_radar": bool(status.get("scam_radar", False)),
+            "behavior_monitor": bool(status.get("behavior_monitor", False)),
+            "fake_news": bool(status.get("fake_news", False)),
+            "phishing_detector": bool(status.get("phishing_detector", False)),
+            # Loan scoring is rule-based and does not require a serialized model.
+            "loan_scorer": bool(status.get("loan_scorer", True)),
+        },
     }), 200
 
 
-# ─────────────────────────────────────────
-# GET /api/version
-# ─────────────────────────────────────────
 @health_bp.route("/api/version", methods=["GET"])
 def version():
-    """
-    Project info endpoint.
-    Show judges all modules and tech stack.
-    """
+    """Project and module metadata."""
     return jsonify({
         "project": "CyberRakshak",
         "version": "1.0.0",
-        "team":    "Arctic Thunder",
-        "event":   "AiFi Hackathon — REVA University",
         "modules": [
             "Scam Radar",
             "Behavior Monitor",
             "Fake News Checker",
-            "Loan Risk Scanner"
+            "Phishing Detector",
+            "Loan Risk Scanner",
         ],
         "tech_stack": {
-            "frontend": "React + Anime.js",
-            "backend":  "Flask + Python",
-            "ml":       "Scikit-learn + NLTK"
-        }
+            "frontend": "React + Vite",
+            "backend": "Flask + Python",
+            "ml": "Scikit-learn + NLTK",
+        },
     }), 200
