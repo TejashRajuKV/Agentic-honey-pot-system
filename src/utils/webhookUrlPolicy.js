@@ -1,0 +1,89 @@
+// src/utils/webhookUrlPolicy.js
+const dns = require("node:dns/promises");
+const net = require("node:net");
+
+const blockedRanges = new net.BlockList();
+[
+    ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10],
+    ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12],
+    ["192.0.0.0", 24], ["192.0.2.0", 24], ["192.88.99.0", 24],
+    ["192.168.0.0", 16], ["198.18.0.0", 15], ["198.51.100.0", 24],
+    ["203.0.113.0", 24], ["224.0.0.0", 4], ["240.0.0.0", 4],
+].forEach(([address, prefix]) => blockedRanges.addSubnet(address, prefix, "ipv4"));
+
+[
+    ["::", 128], ["::1", 128], ["::ffff:0:0", 96], ["64:ff9b:1::", 48],
+    ["100::", 64], ["2001::", 23], ["2001:db8::", 32], ["2002::", 16],
+    ["fc00::", 7], ["fe80::", 10], ["ff00::", 8],
+].forEach(([address, prefix]) => blockedRanges.addSubnet(address, prefix, "ipv6"));
+
+function isPublicAddress(address) {
+    const family = net.isIP(address);
+    if (!family) return false;
+    return !blockedRanges.check(address, family === 4 ? "ipv4" : "ipv6");
+}
+
+function isLocalHostname(hostname) {
+    const host = hostname.toLowerCase().replace(/\.$/, "");
+    return host === "localhost"
+        || host.endsWith(".localhost")
+        || host.endsWith(".local")
+        || host.endsWith(".internal")
+        || host.endsWith(".lan")
+        || host.endsWith(".home.arpa");
+}
+
+/**
+ * Validate a webhook target before making an outbound request.
+ * All DNS answers must be public addresses to reduce SSRF risk.
+ * HTTP is disabled unless explicitly enabled for controlled development targets.
+ */
+async function validateWebhookUrl(value, options = {}) {
+    const lookup = options.lookup || ((hostname) => dns.lookup(hostname, { all: true, verbatim: true }));
+    const allowHttp = options.allowHttp ?? process.env.ALLOW_INSECURE_WEBHOOKS === "true";
+
+    if (typeof value !== "string" || value.trim() === "") {
+        throw new Error("Webhook URL must be a non-empty URL");
+    }
+
+    let url;
+    try {
+        url = new URL(value);
+    } catch {
+        throw new Error("Webhook URL is invalid");
+    }
+
+    if (url.protocol !== "https:" && !(allowHttp && url.protocol === "http:")) {
+        throw new Error("Webhook URL must use HTTPS (HTTP requires ALLOW_INSECURE_WEBHOOKS=true)");
+    }
+    if (url.username || url.password) {
+        throw new Error("Webhook URL must not contain embedded credentials");
+    }
+    if (!url.hostname || isLocalHostname(url.hostname)) {
+        throw new Error("Webhook URL must target a public hostname");
+    }
+
+    const hostname = url.hostname.replace(/^\[|\]$/g, "");
+    const family = net.isIP(hostname);
+    let addresses;
+    if (family) {
+        addresses = [{ address: hostname, family }];
+    } else {
+        try {
+            addresses = await lookup(hostname);
+        } catch {
+            throw new Error("Webhook hostname could not be resolved");
+        }
+    }
+
+    if (!Array.isArray(addresses) || addresses.length === 0) {
+        throw new Error("Webhook hostname did not resolve to an address");
+    }
+    if (addresses.some((entry) => !isPublicAddress(entry.address))) {
+        throw new Error("Webhook URL resolves to a non-public or reserved IP address");
+    }
+
+    return url;
+}
+
+module.exports = { isPublicAddress, isLocalHostname, validateWebhookUrl };
