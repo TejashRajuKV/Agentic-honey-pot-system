@@ -5,6 +5,7 @@ import Home          from "./pages/Home";
 import Dashboard     from "./pages/Dashboard";
 import BootGreeting  from "./components/BootGreeting";
 import CustomCursor  from "./components/CustomCursor";
+import ConsoleAuthGate from "./components/ConsoleAuthGate";
 import "./styles/global.css";
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
   };
 
   return (
+    <ConsoleAuthGate>
     <BrowserRouter>
       <CustomCursor />
 
@@ -43,5 +45,6 @@ export default function App() {
         <Route path="*"          element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
+    </ConsoleAuthGate>
   );
 }

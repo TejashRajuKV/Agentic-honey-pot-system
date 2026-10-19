@@ -2,7 +2,7 @@
 
 CyberRakshak is an integrated cybersecurity project that combines an agentic honeypot, threat-intelligence correlation, machine-learning analysis, and a React analyst console behind a Node.js/Express gateway.
 
-> **Status and security note:** This repository is an active development project. Features, models, and test coverage may vary by environment. Several console and intelligence API routes are currently unauthenticated; do not deploy the service directly to the public internet without adding and verifying authentication, authorization, and webhook destination controls.
+> **Status and security note:** This repository is an active development project. Production deployments must configure console authentication secrets, review authorization boundaries, and validate webhook destinations before exposure to untrusted networks.
 
 ## Table of contents
 
@@ -93,7 +93,7 @@ Copy `.env.example` to `.env`, then edit the values for your machine. For exampl
 Copy-Item .env.example .env
 ```
 
-At minimum, configure a working `MONGODB_URI` and replace the example `API_KEY` with a long, random secret. Do not commit your real `.env` file or share API keys.
+At minimum, configure a working `MONGODB_URI` and replace the example `API_KEY` with a long, random secret. For production, also set `CONSOLE_PASSWORD` (at least 12 characters) and `CONSOLE_SESSION_SECRET` (at least 32 random bytes). The browser console uses a signed, HTTP-only session cookie; do not put these secrets in the frontend. Do not commit your real `.env` file or share API keys.
 
 ### 3. Install dependencies
 
@@ -131,6 +131,8 @@ Values are loaded from environment variables. See [`.env.example`](.env.example)
 | `PORT` | Express gateway port; default `3000` |
 | `MONGODB_URI` | MongoDB connection string |
 | `API_KEY` | API key required by `POST /api/v1/messages`; replace the example value |
+| `CONSOLE_PASSWORD` | Password for the analyst console; at least 12 characters in production |
+| `CONSOLE_SESSION_SECRET` | HMAC signing secret for console sessions; at least 32 random bytes in production |
 | `LLM_API_KEY` | Optional key for LLM-generated agent responses; rule-based fallback may be used when absent |
 | `EVALUATION_CALLBACK_URL` | Optional evaluator callback override for staging/testing; otherwise the configured default is used |
 | `ML_PORT` | Python ML service port; default `5050` |
@@ -171,7 +173,7 @@ The exact routes and payloads are defined in the current route and controller fi
 | `/api/v1/console/*` | Console workflows | Currently public |
 | `/api/v1/analytics/*`, `/api/v1/intelligence/*`, `/api/v1/profiles/*`, `/api/v1/alerts/*`, `/api/v1/quality/*`, `/api/v1/reports/*`, `/api/v1/language/*` | Console data and configuration workflows | Currently public |
 
-For the message endpoint, send the configured key in the `x-api-key` header. Do not assume that other routes are protected merely because this endpoint is.
+For the message endpoint, send the configured key in the `x-api-key` header. The public health probes remain unauthenticated for platform monitoring. In local development, protected dashboard routes remain accessible when console credentials are absent; production intentionally returns `503 CONSOLE_AUTH_NOT_CONFIGURED` until valid credentials are set.
 
 ## Threat correlation: how to interpret links
 

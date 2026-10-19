@@ -81,11 +81,15 @@ app.use(express.static('public'));
 // Apply conservative per-client limits to expensive console/ML and alert APIs.
 // The evaluator-facing /api/v1/messages endpoint retains its separate x-api-key contract.
 const { createRateLimiter } = require("./middleware/rateLimit");
+const { consoleAuth } = require("./middleware/consoleAuth");
 const consoleRateLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 120 });
 const mlRateLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
 const alertsRateLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 60 });
 
 // API Routes
+// Login/session endpoints are intentionally mounted before the protected dashboard APIs.
+app.use("/api/v1/auth", require("./routes/auth"));
+
 const messageRoutes = require("./routes/messageRoutes");
 const analyticsRoutes = require("./routes/analytics");
 const intelligenceRoutes = require("./routes/intelligence");
@@ -96,20 +100,20 @@ const reportsRoutes = require("./routes/reports");
 const languageRoutes = require("./routes/language");
 
 app.use("/api/v1", messageRoutes);
-app.use("/api/v1/analytics", analyticsRoutes);
-app.use("/api/v1/intelligence", intelligenceRoutes);
-app.use("/api/v1/profiles", profilerRoutes);
-app.use("/api/v1/alerts", alertsRateLimit, alertsRoutes);
-app.use("/api/v1/quality", qualityRoutes);
-app.use("/api/v1/reports", reportsRoutes);
-app.use("/api/v1/language", languageRoutes);
+app.use("/api/v1/analytics", consoleAuth, analyticsRoutes);
+app.use("/api/v1/intelligence", consoleAuth, intelligenceRoutes);
+app.use("/api/v1/profiles", consoleAuth, profilerRoutes);
+app.use("/api/v1/alerts", alertsRateLimit, consoleAuth, alertsRoutes);
+app.use("/api/v1/quality", consoleAuth, qualityRoutes);
+app.use("/api/v1/reports", consoleAuth, reportsRoutes);
+app.use("/api/v1/language", consoleAuth, languageRoutes);
 
 // ── System status + first-party web-console API ───────────────────────────
-app.use("/api/v1/system", require("./routes/system"));
-app.use("/api/v1/console", consoleRateLimit, require("./routes/console"));
+app.use("/api/v1/system", consoleAuth, require("./routes/system"));
+app.use("/api/v1/console", consoleRateLimit, consoleAuth, require("./routes/console"));
 
 // ── CyberRakshak ML engine gateway: /api/v1/ml/<module> → ml/ Flask /api/<module> ──
-app.use("/api/v1/ml", mlRateLimit, require("./routes/ml"));
+app.use("/api/v1/ml", mlRateLimit, consoleAuth, require("./routes/ml"));
 
 // Unknown API paths get JSON 404s (never the SPA shell)
 app.use("/api", (req, res) => {
