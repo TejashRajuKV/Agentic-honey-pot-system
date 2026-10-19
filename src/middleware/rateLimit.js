@@ -50,7 +50,7 @@ function createRateLimiter(options = {}) {
         const resetSeconds = Math.max(1, Math.ceil((bucket.resetAt - currentTime) / 1000));
         res.setHeader("RateLimit-Limit", String(maxRequests));
         res.setHeader("RateLimit-Remaining", String(remaining));
-        res.setHeader("RateLimit-Reset", String(Math.ceil(bucket.resetAt / 1000)));
+        res.setHeader("RateLimit-Reset", String(resetSeconds));
 
         if (bucket.count > maxRequests) {
             res.setHeader("Retry-After", String(resetSeconds));
