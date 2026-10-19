@@ -187,13 +187,13 @@ class AlertService {
             };
 
             // Add authentication if configured
-            if (config.auth.type === 'bearer') {
+            if (config.auth?.type === 'bearer') {
                 headers['Authorization'] = `Bearer ${config.auth.token}`;
-            } else if (config.auth.type === 'api_key') {
+            } else if (config.auth?.type === 'api_key') {
                 headers[config.auth.headerName || 'X-API-Key'] = config.auth.token;
-            } else if (config.auth.type === 'basic') {
+            } else if (config.auth?.type === 'basic') {
                 headers['Authorization'] = `Basic ${Buffer.from(config.auth.token).toString('base64')}`;
-            } else if (config.auth.type === 'hmac' && config.auth.token) {
+            } else if (config.auth?.type === 'hmac' && config.auth.token) {
                 // Receiver verifies: HMAC-SHA256(secret, `${timestamp}.${rawBody}`) — replay-safe with a timestamp window
                 const timestamp = Math.floor(Date.now() / 1000).toString();
                 const signature = crypto.createHmac('sha256', config.auth.token).update(`${timestamp}.${body}`).digest('hex');
@@ -224,7 +224,8 @@ class AlertService {
 
         } catch (error) {
             // Retry logic
-            if (config.retryConfig.enabled && retryCount < config.retryConfig.maxRetries) {
+            const destinationRejected = /Webhook URL|hostname|HTTPS|credentials|IP address|resolve/i.test(error.message);
+            if (!destinationRejected && config.retryConfig?.enabled && retryCount < (config.retryConfig.maxRetries || 0)) {
                 await new Promise(resolve => setTimeout(resolve, config.retryConfig.retryDelay));
                 return this._sendWebhook(config, payload, retryCount + 1);
             }
