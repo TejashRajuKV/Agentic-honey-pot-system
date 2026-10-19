@@ -15,6 +15,7 @@ export default function ThreatGraph() {
     const [error, setError] = useState(null);
     const [query, setQuery] = useState("");
     const [minRisk, setMinRisk] = useState("0");
+    const [relationshipType, setRelationshipType] = useState("all");
     const [selectedId, setSelectedId] = useState(null);
 
     const refresh = useCallback(async () => {
@@ -47,7 +48,14 @@ export default function ThreatGraph() {
     }, [graph, query, minRisk]);
 
     const nodeIds = useMemo(() => new Set(nodes.map((node) => node.id)), [nodes]);
-    const edges = useMemo(() => (graph?.edges || []).filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)), [graph, nodeIds]);
+    const edges = useMemo(() => (graph?.edges || []).filter((edge) => {
+        if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) return false;
+        if (relationshipType === "all") return true;
+        return (edge.sharedIdentifiers || []).some((indicator) => {
+            const type = typeof indicator === "string" ? "" : String(indicator.type || "").toLowerCase();
+            return type === relationshipType;
+        });
+    }), [graph, nodeIds, relationshipType]);
     const positions = useMemo(() => {
         const cx = 450, cy = 245;
         const radius = Math.min(185, 65 + nodes.length * 5);
@@ -84,6 +92,11 @@ export default function ThreatGraph() {
                 <label className="mono hp-muted">MIN RISK&nbsp;
                     <select className="forensic-input hp-input" style={{ display: "inline-block", width: 120, marginTop: 0 }} value={minRisk} onChange={(e) => setMinRisk(e.target.value)}>
                         <option value="0">ALL</option><option value="50">50+</option><option value="80">80+</option>
+                    </select>
+                </label>
+                <label className="mono hp-muted">LINK TYPE&nbsp;
+                    <select className="forensic-input hp-input" style={{ display: "inline-block", width: 140, marginTop: 0 }} value={relationshipType} onChange={(e) => setRelationshipType(e.target.value)}>
+                        <option value="all">ALL</option><option value="upi">UPI ID</option><option value="phone">PHONE</option><option value="url">URL / DOMAIN</option>
                     </select>
                 </label>
                 <button className="btn-demo" onClick={refresh} disabled={loading}>{loading ? "REFRESHING…" : "[ REFRESH_GRAPH ]"}</button>
@@ -131,7 +144,7 @@ export default function ThreatGraph() {
                         </div>
                         <div className="hp-actions">
                             <span className="mono hp-muted">NODE COLOUR = RISK</span>
-                            <span className="mono hp-muted">LINE = SHARED IDENTIFIER</span>
+                            <span className="mono hp-muted">LINE = SHARED IDENTIFIER (UPI / PHONE / URL)</span>
                             <span className="mono hp-muted">THICKER LINE = MORE SHARED INDICATORS</span>
                         </div>
                     </Panel>
