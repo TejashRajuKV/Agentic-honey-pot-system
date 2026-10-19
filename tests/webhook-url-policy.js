@@ -6,12 +6,13 @@ async function main() {
     for (const ip of [
         "0.0.0.0", "10.1.2.3", "100.64.1.1", "127.0.0.1", "169.254.10.20",
         "172.16.0.1", "172.31.255.254", "192.168.1.1", "198.18.0.1", "224.0.0.1",
-        "::", "::1", "fc00::1", "fe80::1", "ff02::1", "::ffff:127.0.0.1"
+        "::", "::1", "fc00::1", "fe80::1", "ff02::1", "::ffff:127.0.0.1", "::ffff:7f00:1"
     ]) assert.equal(isPublicAddress(ip), false, `${ip} must not be treated as public`);
 
     assert.equal(isPublicAddress("8.8.8.8"), true);
     assert.equal(isPublicAddress("1.1.1.1"), true);
     assert.equal(isPublicAddress("2606:4700:4700::1111"), true);
+    assert.equal(isPublicAddress("::ffff:808:808"), true, "public IPv4-mapped IPv6 addresses should remain allowed");
 
     await assert.rejects(validateWebhookUrl("http://example.com"), /HTTPS/);
     await assert.rejects(validateWebhookUrl("file:///etc/passwd"), /HTTPS/);
