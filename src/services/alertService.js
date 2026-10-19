@@ -1,6 +1,7 @@
 // src/services/alertService.js
 const crypto = require('crypto');
 const AlertConfig = require('../models/AlertConfig');
+const { validateWebhookUrl } = require('../utils/webhookUrlPolicy');
 // Uses Node's built-in fetch (node-fetch v3 is ESM-only and cannot be require()d)
 
 /**
@@ -178,6 +179,7 @@ class AlertService {
     async _sendWebhook(config, payload, retryCount = 0) {
         const started = Date.now();
         try {
+            await validateWebhookUrl(config.webhookUrl);
             const body = JSON.stringify(payload);
             const headers = {
                 'Content-Type': 'application/json',
@@ -185,13 +187,13 @@ class AlertService {
             };
 
             // Add authentication if configured
-            if (config.auth.type === 'bearer') {
+            if (config.auth?.type === 'bearer') {
                 headers['Authorization'] = `Bearer ${config.auth.token}`;
-            } else if (config.auth.type === 'api_key') {
+            } else if (config.auth?.type === 'api_key') {
                 headers[config.auth.headerName || 'X-API-Key'] = config.auth.token;
-            } else if (config.auth.type === 'basic') {
+            } else if (config.auth?.type === 'basic') {
                 headers['Authorization'] = `Basic ${Buffer.from(config.auth.token).toString('base64')}`;
-            } else if (config.auth.type === 'hmac' && config.auth.token) {
+            } else if (config.auth?.type === 'hmac' && config.auth.token) {
                 // Receiver verifies: HMAC-SHA256(secret, `${timestamp}.${rawBody}`) — replay-safe with a timestamp window
                 const timestamp = Math.floor(Date.now() / 1000).toString();
                 const signature = crypto.createHmac('sha256', config.auth.token).update(`${timestamp}.${body}`).digest('hex');
@@ -203,7 +205,9 @@ class AlertService {
                 method: 'POST',
                 headers,
                 body,
-                signal: AbortSignal.timeout(10000)
+                signal: AbortSignal.timeout(10000),
+                // Never follow redirects: a public endpoint must not redirect the server to a private address.
+                redirect: 'manual'
             });
 
             if (!response.ok) {
@@ -220,7 +224,8 @@ class AlertService {
 
         } catch (error) {
             // Retry logic
-            if (config.retryConfig.enabled && retryCount < config.retryConfig.maxRetries) {
+            const destinationRejected = /Webhook URL|hostname|HTTPS|credentials|IP address|resolve/i.test(error.message);
+            if (!destinationRejected && config.retryConfig?.enabled && retryCount < (config.retryConfig.maxRetries || 0)) {
                 await new Promise(resolve => setTimeout(resolve, config.retryConfig.retryDelay));
                 return this._sendWebhook(config, payload, retryCount + 1);
             }
@@ -426,6 +431,7 @@ class AlertService {
         };
 
         try {
+            await validateWebhookUrl(webhookUrl);
             const headers = {
                 'Content-Type': 'application/json'
             };
@@ -446,7 +452,8 @@ class AlertService {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(testPayload),
-                timeout: 5000
+                signal: AbortSignal.timeout(5000),
+                redirect: 'manual'
             });
 
             return {
