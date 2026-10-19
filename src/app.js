@@ -30,7 +30,9 @@ app.use(cors({
         // Requests without Origin are server-to-server / CLI clients and are not
         // protected by CORS; sensitive routes still require their own auth.
         if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-        return cb(new Error("Origin not allowed by CORS"));
+        const error = new Error("Origin not allowed by CORS");
+        error.status = 403;
+        return cb(error);
     },
     credentials: false,
 }));
