@@ -13,6 +13,7 @@ import ThreatIntel      from "../modules/honeypot/ThreatIntel";
 import Profiles         from "../modules/honeypot/Profiles";
 import Archetypes       from "../modules/honeypot/Archetypes";
 import Campaigns        from "../modules/honeypot/Campaigns";
+import ThreatGraph      from "../modules/honeypot/ThreatGraph";
 import Protection       from "../modules/honeypot/Protection";
 import Alerts           from "../modules/honeypot/Alerts";
 import Overview         from "../modules/honeypot/Overview";
@@ -52,6 +53,7 @@ const MODULES = [
   { id: "scammers", label: "SCAMMER INTELLIGENCE", subs: [
     { id: "profiles",   label: "PROFILES",                 render: (c) => <Profiles selected={c.profileId} onSelect={(id) => c.go("scammers", "profiles", { profileId: id })} /> },
     { id: "campaigns",  label: "CAMPAIGNS",                render: (c) => <Campaigns openSession={(id) => c.go("honeypot", "cases", { sessionId: id })} /> },
+    { id: "network",    label: "THREAT RELATIONSHIP GRAPH",  render: () => <ThreatGraph /> },
     { id: "archetypes", label: "ARCHETYPES & VULNERABILITY", render: () => <Archetypes /> },
   ]},
   { id: "protect", label: "PROTECTION", subs: [
