@@ -13,7 +13,8 @@
     "test": "node scripts/e2e.js",
     "test:readiness": "node tests/readiness/run.js",
     "test:threat-network": "node tests/threat-network-correlation.js",
-    "test:webhook-policy": "node tests/webhook-url-policy.js"
+    "test:webhook-policy": "node tests/webhook-url-policy.js",
+    "test:rate-limit": "node tests/rate-limit.js"
   },
   "keywords": [
     "honeypot",
