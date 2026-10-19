@@ -5,7 +5,10 @@ const COOKIE_NAME = "cyberrakshak_console";
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
 
 function configured() {
-    return Boolean(process.env.CONSOLE_PASSWORD && process.env.CONSOLE_SESSION_SECRET);
+    return typeof process.env.CONSOLE_PASSWORD === "string"
+        && process.env.CONSOLE_PASSWORD.length >= 12
+        && typeof process.env.CONSOLE_SESSION_SECRET === "string"
+        && Buffer.byteLength(process.env.CONSOLE_SESSION_SECRET, "utf8") >= 32;
 }
 
 function sign(value, secret = process.env.CONSOLE_SESSION_SECRET || "") {
