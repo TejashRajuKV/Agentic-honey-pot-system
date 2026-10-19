@@ -311,23 +311,26 @@ class ThreatIntelligenceService {
     _findSharedIdentifiers(profile1, profile2) {
         const shared = [];
 
-        // Check UPI IDs
-        const sharedUpi = profile1.identifiers.upiIds.filter(id =>
-            profile2.identifiers.upiIds.includes(id)
+        const identifiers1 = profile1.identifiers || {};
+        const identifiers2 = profile2.identifiers || {};
+
+        // Compare each supported indicator family independently. Missing arrays
+        // are treated as empty for older profiles created before a field existed.
+        const sharedUpi = (identifiers1.upiIds || []).filter(id =>
+            (identifiers2.upiIds || []).includes(id)
         );
         shared.push(...sharedUpi.map(id => ({ type: 'upi', value: id })));
 
-        // Check phone numbers
-        const sharedPhone = profile1.identifiers.phoneNumbers.filter(num =>
-            profile2.identifiers.phoneNumbers.includes(num)
+        const sharedPhone = (identifiers1.phoneNumbers || []).filter(num =>
+            (identifiers2.phoneNumbers || []).includes(num)
         );
         shared.push(...sharedPhone.map(num => ({ type: 'phone', value: num })));
 
         // URLs are collected by the pipeline too; include them in correlation so
         // shared domains and phishing links are not silently omitted from the graph.
-        const urls1 = profile1.identifiers?.urls || [];
-        const urls2 = profile2.identifiers?.urls || [];
-        const sharedUrls = urls1.filter(url => urls2.includes(url));
+        const sharedUrls = (identifiers1.urls || []).filter(url =>
+            (identifiers2.urls || []).includes(url)
+        );
         shared.push(...sharedUrls.map(url => ({ type: 'url', value: url })));
 
         return shared;
