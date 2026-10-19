@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const alertService = require('../services/alertService');
 const AlertConfig = require('../models/AlertConfig');
+const { validateWebhookUrl } = require('../utils/webhookUrlPolicy');
 
 /**
  * @route GET /api/v1/alerts/config
@@ -16,7 +17,9 @@ router.get('/config', async (req, res) => {
             config = await AlertConfig.create({});
         }
 
-        res.json({ status: 'success', data: config });
+        const safeConfig = config.toObject ? config.toObject() : { ...config };
+        if (safeConfig.auth) safeConfig.auth.token = safeConfig.auth.token ? '••••••••' : '';
+        res.json({ status: 'success', data: safeConfig });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
     }
@@ -28,12 +31,20 @@ router.get('/config', async (req, res) => {
  */
 router.put('/config', async (req, res) => {
     try {
+        if (req.body?.webhookUrl) await validateWebhookUrl(req.body.webhookUrl);
+
+        // Only accept documented configuration fields; do not allow clients to overwrite history/stats.
+        const allowedFields = ['webhookUrl', 'enabled', 'triggers', 'channels', 'filters', 'auth', 'retryConfig'];
+        const updates = Object.fromEntries(allowedFields
+            .filter((key) => Object.prototype.hasOwnProperty.call(req.body || {}, key))
+            .map((key) => [key, req.body[key]]));
+
         let config = await AlertConfig.findOne();
 
         if (!config) {
-            config = new AlertConfig(req.body);
+            config = new AlertConfig(updates);
         } else {
-            Object.assign(config, req.body);
+            Object.assign(config, updates);
         }
 
         await config.save();
@@ -55,11 +66,13 @@ router.post('/test', async (req, res) => {
         if (!webhookUrl) {
             return res.status(400).json({ status: 'error', message: 'webhookUrl required' });
         }
+        await validateWebhookUrl(webhookUrl);
 
         const result = await alertService.testWebhook(webhookUrl, auth);
         res.json({ status: 'success', data: result });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        const isValidationError = /Webhook URL|hostname|HTTPS|credentials|IP address|resolve/i.test(error.message);
+        res.status(isValidationError ? 400 : 500).json({ status: 'error', message: error.message });
     }
 });
 
@@ -73,7 +86,8 @@ router.get('/history', async (req, res) => {
         const history = await alertService.getAlertHistory(parseInt(limit));
         res.json({ status: 'success', data: history, count: history.length });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        const isValidationError = /Webhook URL|hostname|HTTPS|credentials|IP address|resolve/i.test(error.message);
+        res.status(isValidationError ? 400 : 500).json({ status: 'error', message: error.message });
     }
 });
 
