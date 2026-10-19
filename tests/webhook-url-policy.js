@@ -35,7 +35,7 @@ async function main() {
     });
     assert.equal(allowedHttp.protocol, "http:");
 
-    console.log("PASS webhook URL policy: protocols, credentials, local/private IPs, DNS rebinding signals");
+    console.log("PASS webhook URL policy: protocols, credentials, local/private IPs, DNS answers resolving to private addresses");
 }
 
 main().catch((error) => {
