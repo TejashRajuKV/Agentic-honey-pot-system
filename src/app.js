@@ -78,6 +78,13 @@ app.get("/api/v1/ping", (req, res) => res.json({ status: "ok" }));
 // Serve static files from public directory (dashboard)
 app.use(express.static('public'));
 
+// Apply conservative per-client limits to expensive console/ML and alert APIs.
+// The evaluator-facing /api/v1/messages endpoint retains its separate x-api-key contract.
+const { createRateLimiter } = require("./middleware/rateLimit");
+const consoleRateLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 120 });
+const mlRateLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
+const alertsRateLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 60 });
+
 // API Routes
 const messageRoutes = require("./routes/messageRoutes");
 const analyticsRoutes = require("./routes/analytics");
@@ -92,17 +99,17 @@ app.use("/api/v1", messageRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
 app.use("/api/v1/intelligence", intelligenceRoutes);
 app.use("/api/v1/profiles", profilerRoutes);
-app.use("/api/v1/alerts", alertsRoutes);
+app.use("/api/v1/alerts", alertsRateLimit, alertsRoutes);
 app.use("/api/v1/quality", qualityRoutes);
 app.use("/api/v1/reports", reportsRoutes);
 app.use("/api/v1/language", languageRoutes);
 
 // ── System status + first-party web-console API ───────────────────────────
 app.use("/api/v1/system", require("./routes/system"));
-app.use("/api/v1/console", require("./routes/console"));
+app.use("/api/v1/console", consoleRateLimit, require("./routes/console"));
 
 // ── CyberRakshak ML engine gateway: /api/v1/ml/<module> → ml/ Flask /api/<module> ──
-app.use("/api/v1/ml", require("./routes/ml"));
+app.use("/api/v1/ml", mlRateLimit, require("./routes/ml"));
 
 // Unknown API paths get JSON 404s (never the SPA shell)
 app.use("/api", (req, res) => {
