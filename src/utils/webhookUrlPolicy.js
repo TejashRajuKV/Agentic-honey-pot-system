@@ -12,14 +12,34 @@ const blockedRanges = new net.BlockList();
 ].forEach(([address, prefix]) => blockedRanges.addSubnet(address, prefix, "ipv4"));
 
 [
-    ["::", 128], ["::1", 128], ["::ffff:0:0", 96], ["64:ff9b:1::", 48],
+    ["::", 128], ["::1", 128], ["64:ff9b:1::", 48],
     ["100::", 64], ["2001::", 23], ["2001:db8::", 32], ["2002::", 16],
     ["fc00::", 7], ["fe80::", 10], ["ff00::", 8],
 ].forEach(([address, prefix]) => blockedRanges.addSubnet(address, prefix, "ipv6"));
 
+function mappedIpv4Address(address) {
+    const value = String(address).toLowerCase();
+    if (!value.startsWith("::ffff:")) return null;
+
+    const tail = value.slice("::ffff:".length);
+    if (net.isIP(tail) === 4) return tail;
+
+    const groups = tail.split(":");
+    if (groups.length !== 2 || groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return null;
+    const high = parseInt(groups[0], 16);
+    const low = parseInt(groups[1], 16);
+    return [
+        high >> 8, high & 255, low >> 8, low & 255
+    ].join(".");
+}
+
 function isPublicAddress(address) {
     const family = net.isIP(address);
     if (!family) return false;
+    if (family === 6) {
+        const mapped = mappedIpv4Address(address);
+        if (mapped) return isPublicAddress(mapped);
+    }
     return !blockedRanges.check(address, family === 4 ? "ipv4" : "ipv6");
 }
 
