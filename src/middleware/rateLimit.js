@@ -2,9 +2,9 @@
 // Small in-memory per-client rate limiter for expensive/public API surfaces.
 // For multi-instance deployments, use a shared store at the edge or in Redis.
 function createRateLimiter(options = {}) {
-    const windowMs = Number(options.windowMs || 60_000);
-    const maxRequests = Number(options.maxRequests || 60);
-    const maxKeys = Number(options.maxKeys || 10_000);
+    const windowMs = Number(options.windowMs ?? 60_000);
+    const maxRequests = Number(options.maxRequests ?? 60);
+    const maxKeys = Number(options.maxKeys ?? 10_000);
     const now = options.now || Date.now;
     const keyGenerator = options.keyGenerator || ((req) => req.ip || req.socket?.remoteAddress || "unknown");
     const buckets = new Map();
