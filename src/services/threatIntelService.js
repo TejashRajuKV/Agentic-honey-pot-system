@@ -129,32 +129,56 @@ class ThreatIntelligenceService {
     /**
      * Check if identifiers are known threats
      */
-    async checkKnownThreat(identifiers) {
-        const { upiIds = [], phoneNumbers = [], urls = [] } = identifiers;
+    async checkKnownThreat(identifiers = {}) {
+        const cleanValues = (values, maxLength) => Array.isArray(values)
+            ? [...new Set(values
+                .filter((value) => typeof value === 'string' && value.trim() && value.length <= maxLength)
+                .map((value) => value.trim()))].slice(0, 100)
+            : [];
+        const upiIds = cleanValues(identifiers?.upiIds, 256);
+        const phoneNumbers = cleanValues(identifiers?.phoneNumbers, 64);
+        const urls = cleanValues(identifiers?.urls, 2048);
 
-        // Check ScammerIntelligence database
-        const knownThreats = await ScammerIntelligence.find({
-            $or: [
-                { upiId: { $in: upiIds } },
-                { phoneNumber: { $in: phoneNumbers } }
-            ]
-        });
+        // Avoid broad queries when callers provide no usable indicators.
+        if (upiIds.length === 0 && phoneNumbers.length === 0 && urls.length === 0) {
+            return {
+                isKnownThreat: false,
+                matches: { intelligence: [], profiles: [] },
+                riskLevel: 'LOW',
+                recommendedAction: 'NORMAL'
+            };
+        }
 
-        // Check ScammerProfile database
-        const profiles = await ScammerProfile.find({
-            $or: [
-                { 'identifiers.upiIds': { $in: upiIds } },
-                { 'identifiers.phoneNumbers': { $in: phoneNumbers } },
-                { 'identifiers.urls': { $in: urls } }
-            ]
-        });
+        const intelligenceClauses = [];
+        if (upiIds.length) intelligenceClauses.push({ upiId: { $in: upiIds } });
+        if (phoneNumbers.length) intelligenceClauses.push({ phoneNumber: { $in: phoneNumbers } });
+        const profileClauses = [];
+        if (upiIds.length) profileClauses.push({ 'identifiers.upiIds': { $in: upiIds } });
+        if (phoneNumbers.length) profileClauses.push({ 'identifiers.phoneNumbers': { $in: phoneNumbers } });
+        if (urls.length) profileClauses.push({ 'identifiers.urls': { $in: urls } });
+
+        // Return only fields needed for analyst triage, and cap result counts so a
+        // common or deliberately repeated indicator cannot dump the full database.
+        const [knownThreats, profiles] = await Promise.all([
+            intelligenceClauses.length
+                ? ScammerIntelligence.find({ $or: intelligenceClauses })
+                    .select('upiId phoneNumber sessionCount riskLevel scamTypes averageConfidence isBlacklisted firstSeenAt lastSeenAt')
+                    .sort({ sessionCount: -1, lastSeenAt: -1 })
+                    .limit(50)
+                    .lean()
+                : [],
+            profileClauses.length
+                ? ScammerProfile.find({ $or: profileClauses })
+                    .select('profileId identifiers riskScore status confidence firstSeen lastSeen')
+                    .sort({ riskScore: -1, lastSeen: -1 })
+                    .limit(50)
+                    .lean()
+                : []
+        ]);
 
         return {
             isKnownThreat: knownThreats.length > 0 || profiles.length > 0,
-            matches: {
-                intelligence: knownThreats,
-                profiles: profiles
-            },
+            matches: { intelligence: knownThreats, profiles },
             riskLevel: this._assessRiskLevel(knownThreats, profiles),
             recommendedAction: this._getRecommendedAction(knownThreats, profiles)
         };
