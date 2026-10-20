@@ -137,6 +137,9 @@ const scammerProfileSchema = new Schema({
 // Compound indexes for efficient queries
 scammerProfileSchema.index({ 'identifiers.upiIds': 1 });
 scammerProfileSchema.index({ 'identifiers.phoneNumbers': 1 });
+// Threat correlation and profile matching also query these indicator classes.
+scammerProfileSchema.index({ 'identifiers.urls': 1 });
+scammerProfileSchema.index({ 'identifiers.emailAddresses': 1 });
 scammerProfileSchema.index({ riskScore: -1 });
 scammerProfileSchema.index({ lastSeen: -1 });
 
