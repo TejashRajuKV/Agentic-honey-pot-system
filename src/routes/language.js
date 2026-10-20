@@ -3,6 +3,12 @@ const express = require('express');
 const router = express.Router();
 const languageService = require('../services/languageService');
 
+function validSessionId(value) {
+    return typeof value === 'string' && value.trim().length > 0 && value.length <= 200
+        && !value.includes('/') && !value.includes('\\\\')
+        && ![...value].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127);
+}
+
 /**
  * @route POST /api/v1/language/detect
  * @desc Detect language of text
@@ -28,6 +34,9 @@ router.post('/detect', async (req, res) => {
  */
 router.get('/stats/:sessionId', async (req, res) => {
     try {
+        if (!validSessionId(req.params.sessionId)) {
+            return res.status(400).json({ status: 'error', message: 'Invalid sessionId' });
+        }
         const stats = await languageService.getLanguageStats(req.params.sessionId);
         res.json({ status: 'success', data: stats });
     } catch (error) {
@@ -43,8 +52,8 @@ router.post('/analyze-hinglish', async (req, res) => {
     try {
         const { text } = req.body || {};
 
-        if (typeof text !== 'string' || !text.trim()) {
-            return res.status(400).json({ status: 'error', message: 'text (non-empty string) required' });
+        if (typeof text !== 'string' || !text.trim() || text.length > 20000) {
+            return res.status(400).json({ status: 'error', message: 'text must be a non-empty string of at most 20000 characters' });
         }
 
         const analysis = languageService.handleHinglish(text);
