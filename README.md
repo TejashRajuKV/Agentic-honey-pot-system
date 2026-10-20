@@ -168,12 +168,12 @@ The exact routes and payloads are defined in the current route and controller fi
 |---|---|---|
 | `GET /`, `GET /api/v1/health` | Liveness/health checks | Public |
 | `POST /api/v1/messages` | Evaluator/honeypot message pipeline | Requires `x-api-key` |
-| `GET /api/v1/system/status` | Subsystem diagnostics | Currently public |
-| `/api/v1/ml/*` | ML gateway endpoints | Currently public |
-| `/api/v1/console/*` | Console workflows | Currently public |
-| `/api/v1/analytics/*`, `/api/v1/intelligence/*`, `/api/v1/profiles/*`, `/api/v1/alerts/*`, `/api/v1/quality/*`, `/api/v1/reports/*`, `/api/v1/language/*` | Console data and configuration workflows | Currently public |
+| `GET /api/v1/system/status` | Subsystem diagnostics | Requires console session when authentication is configured |
+| `/api/v1/ml/*` | ML gateway endpoints | Requires console session when authentication is configured |
+| `/api/v1/console/*` | Console workflows | Requires console session when authentication is configured |
+| `/api/v1/analytics/*`, `/api/v1/intelligence/*`, `/api/v1/profiles/*`, `/api/v1/alerts/*`, `/api/v1/quality/*`, `/api/v1/reports/*`, `/api/v1/language/*` | Console data and configuration workflows | Requires console session when authentication is configured |
 
-For the message endpoint, send the configured key in the `x-api-key` header. The public health probes remain unauthenticated for platform monitoring. In local development, protected dashboard routes remain accessible when console credentials are absent; production intentionally returns `503 CONSOLE_AUTH_NOT_CONFIGURED` until valid credentials are set.
+For the message endpoint, send the configured key in the `x-api-key` header. The public health probes and `/api/v1/auth/*` session/login endpoints remain unauthenticated. Protected dashboard routes require a signed HTTP-only session when `CONSOLE_PASSWORD` and `CONSOLE_SESSION_SECRET` are configured. In local development, those routes remain accessible when credentials are absent; production intentionally returns `503 CONSOLE_AUTH_NOT_CONFIGURED` until valid credentials are set.
 
 ## Threat correlation: how to interpret links
 
