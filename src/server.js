@@ -32,13 +32,34 @@ mongoose
     console.error("⚠️  MongoDB connection error (server still running):", err.message);
   });
 
-// Graceful shutdown
-process.on('SIGTERM', () => process.emit('SIGINT'));
-process.on('SIGINT', () => {
-  console.log('\n🛑 Shutting down gracefully...');
+// Graceful shutdown: drain HTTP work and close MongoDB, but never hang forever
+// if a keep-alive socket or database connection fails to close.
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`\n🛑 Shutting down gracefully (${signal})...`);
   mlManager.stop();
-  server.close(() => {
-    mongoose.connection.close();
-    process.exit(0);
+
+  const forceExit = setTimeout(() => {
+    console.error('⚠️  Graceful shutdown timed out; forcing process exit.');
+    process.exit(1);
+  }, 10000);
+  forceExit.unref();
+
+  server.close(async () => {
+    try {
+      await mongoose.disconnect();
+      clearTimeout(forceExit);
+      process.exit(0);
+    } catch {
+      console.error('⚠️  MongoDB shutdown failed.');
+      clearTimeout(forceExit);
+      process.exit(1);
+    }
   });
-});
+  // Close idle keep-alive sockets immediately when supported by the Node version.
+  server.closeIdleConnections?.();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
