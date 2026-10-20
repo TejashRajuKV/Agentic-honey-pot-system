@@ -195,17 +195,29 @@ const handleIncomingMessageUnlocked = async (req, res) => {
             await auditService.logSessionStart(sessionId, platform, sender);
         }
 
-        // Get conversation history - prefer provided history, fall back to database
+        // Bound caller-supplied history before passing it into detection/LLM prompts.
+        // A valid JSON body can still contain hundreds of turns and inflate inference
+        // cost or latency; retain only the latest 30 usable turns and cap each turn.
         let history;
         if (providedHistory && Array.isArray(providedHistory) && providedHistory.length > 0) {
-            // Map evaluation platform format to internal format
-            history = providedHistory.map(turn => ({
-                role: turn.sender === 'user' ? 'agent' : 'user', // 'user' in their format = our agent, 'scammer' = user
-                text: turn.text,
-                timestamp: turn.timestamp
-            }));
+            history = providedHistory
+                .slice(-30)
+                .filter((turn) => turn && typeof turn.text === 'string' && turn.text.trim().length > 0)
+                .map((turn) => ({
+                    // Evaluation format: 'user' means our agent; other senders are inbound.
+                    role: turn.sender === 'user' ? 'agent' : 'user',
+                    text: sanitizeText(turn.text).slice(0, 1500),
+                    timestamp: typeof turn.timestamp === 'string' || typeof turn.timestamp === 'number'
+                        ? turn.timestamp
+                        : undefined
+                }));
         } else {
             history = await getConversationHistory(sessionId);
+            if (!Array.isArray(history)) history = [];
+            history = history.slice(-30).map((turn) => ({
+                ...turn,
+                text: typeof turn.text === 'string' ? turn.text.slice(0, 1500) : ''
+            })).filter((turn) => turn.text.length > 0);
         }
 
         // EMOTION LAYER: Detect emotion FIRST (before scam detection)
