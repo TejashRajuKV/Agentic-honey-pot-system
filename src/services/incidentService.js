@@ -28,15 +28,28 @@ async function registerEvent({ sessionId, triggers, intelligence = {}, riskScore
     if (isNew) {
         incident = new Incident({
             incidentId: newId(), key, firstEventAt: new Date(),
-            title: `${(scamType || 'Scam').replace(/_/g, ' ').toLowerCase()} — ${upi || phone || sessionId}`,
+            // Keep raw identifiers in structured intelligence fields, not dashboard titles.
+            title: `${(scamType || 'Scam').replace(/_/g, ' ').toLowerCase()} — ${upi ? 'UPI-linked activity' : phone ? 'phone-linked activity' : 'session activity'}`,
         });
     }
     const joinedNewSession = !incident.sessionIds.includes(sessionId);
-    if (joinedNewSession) incident.sessionIds.push(sessionId);
+    if (joinedNewSession) {
+        incident.sessionIds.push(sessionId);
+        if (incident.sessionIds.length > 500) incident.sessionIds = incident.sessionIds.slice(-500);
+    }
 
+    if (!incident.identifiers || typeof incident.identifiers !== 'object') {
+        incident.identifiers = { upiIds: [], phoneNumbers: [], urls: [] };
+    }
     for (const field of ['upiIds', 'phoneNumbers', 'urls']) {
+        if (!Array.isArray(incident.identifiers[field])) incident.identifiers[field] = [];
         for (const v of intelligence[field] || []) {
-            if (!incident.identifiers[field].includes(v)) incident.identifiers[field].push(v);
+            if (typeof v === 'string' && !incident.identifiers[field].includes(v)) {
+                incident.identifiers[field].push(v);
+                if (incident.identifiers[field].length > 500) {
+                    incident.identifiers[field] = incident.identifiers[field].slice(-500);
+                }
+            }
         }
     }
     for (const t of triggers) {
