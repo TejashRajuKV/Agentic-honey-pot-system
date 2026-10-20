@@ -7,6 +7,9 @@ const AnalystFeedback = require("../models/AnalystFeedback");
 const IndicatorReputation = require("../models/IndicatorReputation");
 const ConversationTurn = require("../models/ConversationTurn");
 const AuditLog = require("../models/AuditLog");
+const DetectionRule = require("../models/DetectionRule");
+const PlaybookRun = require("../models/PlaybookRun");
+const ruleLab = require("../services/ruleLabService");
 
 const SEVERITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 const CASE_STATUSES = ["open", "investigating", "contained", "resolved", "false_positive"];
@@ -336,6 +339,157 @@ router.get("/indicators", async (req, res) => {
             effectiveStatus: row.expiresAt && new Date(row.expiresAt).getTime() <= now ? "expired" : row.status
         })) });
     } catch { res.status(500).json({ status: "error", message: "Unable to list indicators" }); }
+});
+
+
+router.get("/rules", async (req, res) => {
+    const limit = boundedLimit(req.query.limit, 100, 200);
+    if (limit === null) return res.status(400).json({ status: "error", message: "limit must be a positive integer" });
+    const filter = {};
+    if (req.query.status !== undefined) {
+        if (!["draft", "enabled", "disabled"].includes(req.query.status)) return res.status(400).json({ status: "error", message: "Unsupported rule status" });
+        filter.status = req.query.status;
+    }
+    try {
+        const rules = await DetectionRule.find(filter).sort({ updatedAt: -1 }).limit(limit).lean();
+        res.json({ status: "success", count: rules.length, data: rules });
+    } catch { res.status(500).json({ status: "error", message: "Unable to list detection rules" }); }
+});
+
+router.post("/rules", async (req, res) => {
+    const input = req.body || {};
+    const invalid = ruleLab.validateRule(input);
+    const description = input.description === undefined ? "" : boundedString(input.description, 1000);
+    const createdBy = input.createdBy === undefined ? "analyst" : boundedString(input.createdBy, 120);
+    if (invalid || description === null || !createdBy) return res.status(400).json({ status: "error", message: invalid || "Invalid rule metadata" });
+    try {
+        const rule = await DetectionRule.create({
+            ruleId: `RULE-${crypto.randomUUID()}`, name: input.name.trim(), description,
+            type: input.type, terms: input.terms || [], severity: input.severity || "MEDIUM",
+            status: "draft", createdBy, updatedBy: createdBy
+        });
+        res.status(201).json({ status: "success", data: rule });
+    } catch { res.status(500).json({ status: "error", message: "Unable to create detection rule" }); }
+});
+
+router.patch("/rules/:ruleId/status", async (req, res) => {
+    const status = req.body?.status;
+    const updatedBy = req.body?.updatedBy === undefined ? "analyst" : boundedString(req.body.updatedBy, 120);
+    if (!["draft", "enabled", "disabled"].includes(status) || !updatedBy) return res.status(400).json({ status: "error", message: "Valid status and updatedBy are required" });
+    try {
+        const rule = await DetectionRule.findOneAndUpdate({ ruleId: req.params.ruleId }, { $set: { status, updatedBy }, $inc: { version: 1 } }, { new: true, runValidators: true });
+        if (!rule) return res.status(404).json({ status: "error", message: "Rule not found" });
+        res.json({ status: "success", data: rule });
+    } catch { res.status(500).json({ status: "error", message: "Unable to update rule status" }); }
+});
+
+router.post("/rules/replay", async (req, res) => {
+    const samples = req.body?.samples;
+    if (!Array.isArray(samples)) return res.status(400).json({ status: "error", message: "samples must be an array" });
+    let rules;
+    try {
+        if (Array.isArray(req.body?.ruleIds)) {
+            if (req.body.ruleIds.length > 100 || req.body.ruleIds.some((id) => typeof id !== "string" || id.length > 100)) {
+                return res.status(400).json({ status: "error", message: "ruleIds must contain at most 100 valid IDs" });
+            }
+            rules = await DetectionRule.find({ ruleId: { $in: req.body.ruleIds } }).lean();
+        } else if (Array.isArray(req.body?.rules)) {
+            if (req.body.rules.length > 100) return res.status(400).json({ status: "error", message: "rules must contain at most 100 entries" });
+            const errors = req.body.rules.map((rule) => ruleLab.validateRule(rule)).filter(Boolean);
+            if (errors.length) return res.status(400).json({ status: "error", message: errors[0] });
+            rules = req.body.rules;
+        } else {
+            rules = await DetectionRule.find({ status: "enabled" }).limit(100).lean();
+        }
+        const result = ruleLab.replayRules(rules, samples);
+        if (rules.some((rule) => rule.ruleId)) {
+            await DetectionRule.updateMany({ ruleId: { $in: rules.map((rule) => rule.ruleId).filter(Boolean) } }, { $set: { lastReplayAt: new Date() } });
+        }
+        res.json({ status: "success", data: result, productionChanged: false });
+    } catch (error) {
+        res.status(400).json({ status: "error", message: error instanceof TypeError ? error.message : "Unable to replay detection rules" });
+    }
+});
+
+router.get("/playbooks/catalog", (_req, res) => {
+    res.json({ status: "success", data: [
+        { id: "create_case", label: "Open investigation case", approvalRequired: true, sideEffects: "Creates an internal case record" },
+        { id: "record_indicator", label: "Record indicator observation", approvalRequired: true, sideEffects: "Creates or updates an internal indicator record" }
+    ], guardrails: ["No external network requests", "No blocking, retaliation, or contacting suspected infrastructure", "Every run requires an explicit approval reason and unique requestId"] });
+});
+
+router.post("/playbooks/execute", async (req, res) => {
+    const playbook = req.body?.playbook;
+    const approved = req.body?.approved === true;
+    const approvedBy = boundedString(req.body?.approvedBy, 120, { required: true });
+    const approvalReason = boundedString(req.body?.approvalReason, 1000, { required: true });
+    const requestId = boundedString(req.body?.requestId, 120, { required: true });
+    if (!["create_case", "record_indicator"].includes(playbook) || !approved || !approvedBy || !approvalReason || !requestId) {
+        return res.status(400).json({ status: "error", message: "A supported playbook, approved=true, approver, reason, and unique requestId are required" });
+    }
+    try {
+        const previous = await PlaybookRun.findOne({ requestId }).lean();
+        if (previous) return res.status(409).json({ status: "error", message: "requestId has already been used", data: previous });
+        let resultReference = "";
+        let safeSummary = "";
+        if (playbook === "create_case") {
+            const title = boundedString(req.body?.title, 200, { required: true });
+            const summary = req.body?.summary === undefined ? "" : boundedString(req.body.summary, 5000);
+            const severity = req.body?.severity || "MEDIUM";
+            const sessionIds = boundedStringArray(req.body?.sessionIds, 100, 200);
+            const indicators = boundedStringArray(req.body?.indicators, 100, 2048);
+            if (!title || summary === null || !SEVERITIES.includes(severity) || !sessionIds || !indicators) return res.status(400).json({ status: "error", message: "Invalid create_case payload" });
+            const created = await InvestigationCase.create({ caseId: `CASE-${crypto.randomUUID()}`, title, summary, severity, sessionIds, indicators, createdBy: approvedBy });
+            resultReference = created.caseId;
+            safeSummary = "Created an internal investigation case";
+        } else {
+            const kind = req.body?.kind;
+            const value = boundedString(req.body?.value, 2048, { required: true });
+            const status = req.body?.status || "suspicious";
+            const confidence = req.body?.confidence === undefined ? 0.5 : req.body.confidence;
+            const source = boundedString(req.body?.source || "approved_playbook", 100, { required: true });
+            if (!["url", "domain", "phone", "upi", "ip", "email", "other"].includes(kind) || !value || !source ||
+                !["unknown", "suspicious", "confirmed", "benign", "expired"].includes(status) ||
+                typeof confidence !== "number" || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+                return res.status(400).json({ status: "error", message: "Invalid record_indicator payload" });
+            }
+            const normalizedValue = normalizeIndicator(kind, value);
+            if (!normalizedValue) return res.status(400).json({ status: "error", message: "Indicator could not be normalized safely" });
+            const item = await IndicatorReputation.findOneAndUpdate(
+                { kind, normalizedValue },
+                { $setOnInsert: { kind, value, normalizedValue, status, confidence, firstSeenAt: new Date() },
+                  $set: { lastSeenAt: new Date() }, $inc: { observationCount: 1 }, $addToSet: { sources: source } },
+                { new: true, upsert: true, runValidators: true }
+            );
+            resultReference = `${kind}:${normalizedValue}`;
+            safeSummary = "Recorded an internal indicator observation";
+        }
+        const run = await PlaybookRun.create({ runId: `RUN-${crypto.randomUUID()}`, playbook, status: "succeeded", approvedBy, approvalReason, requestId, resultReference, safeSummary });
+        res.status(201).json({ status: "success", data: { run, resultReference, safeSummary } });
+    } catch (error) {
+        if (error?.code === 11000) return res.status(409).json({ status: "error", message: "requestId has already been used" });
+        res.status(500).json({ status: "error", message: "Approved playbook could not be completed" });
+    }
+});
+
+router.get("/operations/overview", async (_req, res) => {
+    try {
+        const Session = require("../models/Session");
+        const [sessions, cases, openCases, indicators, feedback, recentEvents, ruleCounts] = await Promise.all([
+            Session.countDocuments({}),
+            InvestigationCase.countDocuments({}),
+            InvestigationCase.countDocuments({ status: { $in: ["open", "investigating", "contained"] } }),
+            IndicatorReputation.countDocuments({}),
+            AnalystFeedback.countDocuments({}),
+            AuditLog.find().sort({ timestamp: -1 }).limit(25).select("eventType sessionId timestamp detection notes").lean(),
+            DetectionRule.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }])
+        ]);
+        res.json({ status: "success", data: {
+            totals: { sessions, cases, openCases, indicators, analystFeedback: feedback },
+            rules: Object.fromEntries(ruleCounts.map((item) => [item._id, item.count])),
+            recentEvents: recentEvents.map((event) => ({ eventType: event.eventType, sessionId: event.sessionId, timestamp: event.timestamp, riskLevel: event.detection?.riskLevel || null, notes: event.notes || "" }))
+        } });
+    } catch { res.status(500).json({ status: "error", message: "Unable to load operations overview" }); }
 });
 
 module.exports = { router, analyzeUrl, normalizeIndicator };
