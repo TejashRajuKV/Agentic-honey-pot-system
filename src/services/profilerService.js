@@ -13,7 +13,7 @@ class ProfilerService {
     /**
      * Build comprehensive profile from session data
      */
-    async buildProfile(sessionId) {
+    async buildProfile(sessionId, retryAttempt = 0) {
         const session = await Session.findOne({ sessionId });
         if (!session) {
             return null;
@@ -154,7 +154,19 @@ class ProfilerService {
 
         profile.lastSeen = new Date();
 
-        await profile.save();
+        try {
+            await profile.save();
+        } catch (error) {
+            // Profile builds may overlap when multiple turns arrive close together.
+            // Optimistic concurrency prevents a stale document from silently
+            // overwriting a newer profile; re-read and rebuild from persisted turns
+            // a small, bounded number of times when that happens.
+            const retryableWriteConflict = error?.name === 'VersionError' || error?.code === 11000;
+            if (retryableWriteConflict && retryAttempt < 2) {
+                return this.buildProfile(sessionId, retryAttempt + 1);
+            }
+            throw error;
+        }
 
         return profile;
     }
