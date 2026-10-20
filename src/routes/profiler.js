@@ -6,7 +6,7 @@ const ScammerProfile = require('../models/ScammerProfile');
 
 function validIdentifier(value) {
     return typeof value === 'string' && value.trim().length > 0 && value.length <= 200
-        && !/[\\/\\0-\\x1f\\x7f]/.test(value);
+        && !value.includes('/') && !value.includes('\\') && !/[\\x00-\\x1f\\x7f]/.test(value);
 }
 
 function boundedInteger(value, fallback, maximum) {
