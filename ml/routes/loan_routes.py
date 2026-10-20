@@ -96,11 +96,9 @@ def loan_score():
             result["risk_color"] = "red"
             result["reason"]     = f"RBI BLACKLISTED — {app_db['danger_reason']}"
 
-        # ── If RBI verified → reduce risk ──
-        elif app_db["db_status"] == "RBI_VERIFIED":
-            result["confidence"] = min(result["confidence"], 15)
-            result["label"]      = "SAFE"
-            result["risk_color"] = "green"
+        # A local reference-list match must never override observed risk factors.
+        # In particular, don't cap a high-risk checklist result just because the
+        # entered app name matches a known brand; brand-name spoofing is possible.
 
         return jsonify(result), 200
 
