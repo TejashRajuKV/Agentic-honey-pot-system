@@ -212,6 +212,20 @@ async function main() {
         ok(zero.status === 400, `zero campaign filter returned ${zero.status}`);
         ok(capped.status === 200, `excessive campaign filter should be capped, got ${capped.status}`);
     });
+    await check("incident listing validates status and pagination inputs", async () => {
+        const invalidLimit = await get("/console/incidents?limit=abc");
+        const fractionalLimit = await get("/console/incidents?limit=1.5");
+        const zeroLimit = await get("/console/incidents?limit=0");
+        const invalidStatus = await get("/console/incidents?status=investigating");
+        const validStatus = await get("/console/incidents?status=resolved");
+        const cappedLimit = await get("/console/incidents?limit=999999999");
+        ok(invalidLimit.status === 400, `invalid incident limit returned ${invalidLimit.status}`);
+        ok(fractionalLimit.status === 400, `fractional incident limit returned ${fractionalLimit.status}`);
+        ok(zeroLimit.status === 400, `zero incident limit returned ${zeroLimit.status}`);
+        ok(invalidStatus.status === 400, `unsupported incident status returned ${invalidStatus.status}`);
+        ok(validStatus.status === 200, `schema-valid incident status returned ${validStatus.status}`);
+        ok(cappedLimit.status === 200, `excessive incident limit should be capped, got ${cappedLimit.status}`);
+    });
     await check("alert history pagination rejects invalid limits and caps large requests", async () => {
         const invalid = await get("/alerts/history?limit=not-a-number");
         const zero = await get("/alerts/history?limit=0");
