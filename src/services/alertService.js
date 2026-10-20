@@ -461,14 +461,18 @@ class AlertService {
             return {
                 success: response.ok,
                 statusCode: response.status,
-                statusText: response.statusText,
+                // Do not echo arbitrary response text from an externally configured endpoint.
+                statusText: response.ok ? 'OK' : 'Webhook returned a non-success status',
                 message: response.ok ? 'Webhook test successful' : 'Webhook test failed'
             };
 
         } catch (error) {
+            // Network and policy errors can contain internal host, DNS, or socket details.
+            // Keep those details out of API responses.
+            const destinationRejected = /Webhook URL|hostname|HTTPS|credentials|IP address|resolve/i.test(error.message);
             return {
                 success: false,
-                error: error.message,
+                error: destinationRejected ? 'Webhook destination rejected by security policy' : 'Webhook delivery failed',
                 message: 'Failed to connect to webhook URL'
             };
         }
