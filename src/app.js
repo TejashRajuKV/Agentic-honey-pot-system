@@ -117,7 +117,8 @@ app.use("/api/v1/ml", mlRateLimit, consoleAuth, require("./routes/ml"));
 
 // Unknown API paths get JSON 404s (never the SPA shell)
 app.use("/api", (req, res) => {
-    res.status(404).json({ status: "error", message: `No such API route: ${req.method} ${req.originalUrl}` });
+    // Do not reflect the raw URL: query strings can contain credentials or other secrets.
+    res.status(404).json({ status: "error", message: "No such API route" });
 });
 
 // ── Web console (React build) — one server, one origin, one port ──────────
