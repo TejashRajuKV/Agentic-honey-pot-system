@@ -22,6 +22,7 @@ export default function InvestigationCenter() {
   const [assignees, setAssignees] = useState({});
   const [caseNotes, setCaseNotes] = useState({});
   const [caseEvidence, setCaseEvidence] = useState({});
+  const [caseReports, setCaseReports] = useState({});
   const [url, setUrl] = useState("");
   const [urlResult, setUrlResult] = useState(null);
   const [samples, setSamples] = useState("Urgent: verify your account immediately\nVisit https://example.com/verify\nPlease pay to sample123@bank\nNormal customer question");
@@ -217,6 +218,8 @@ export default function InvestigationCenter() {
               <div style={{ display: "flex", gap: 6 }}><input style={field} value={caseNotes[item.caseId] || ""} onChange={(e) => setCaseNotes((prev) => ({ ...prev, [item.caseId]: e.target.value }))} maxLength={5000} placeholder="Add analyst note"/><button style={button} onClick={() => { const note = (caseNotes[item.caseId] || "").trim(); if (!note) return setError("Enter a note before saving."); run(() => api.post(`${ROOT}/cases/${encodeURIComponent(item.caseId)}/notes`, { text: note }), "Case note added."); setCaseNotes((prev) => ({ ...prev, [item.caseId]: "" })); }}>Add note</button></div>
               <div style={{ display: "flex", gap: 6 }}><input style={field} value={caseEvidence[item.caseId] || ""} onChange={(e) => setCaseEvidence((prev) => ({ ...prev, [item.caseId]: e.target.value }))} maxLength={500} placeholder="Session / indicator reference"/><button style={button} onClick={() => { const reference = (caseEvidence[item.caseId] || "").trim(); if (!reference) return setError("Enter an evidence reference."); run(() => api.post(`${ROOT}/cases/${encodeURIComponent(item.caseId)}/evidence`, { type: "session", reference, label: "Analyst-linked evidence" }), "Evidence reference attached."); setCaseEvidence((prev) => ({ ...prev, [item.caseId]: "" })); }}>Attach evidence</button></div>
             </div>
+            <div style={{ marginTop: 10 }}><button style={button} onClick={() => run(async () => { const response = await api.get(`${ROOT}/cases/${encodeURIComponent(item.caseId)}/report`); setCaseReports((prev) => ({ ...prev, [item.caseId]: response.data?.data || null })); }, "Case report generated.")}>Generate evidence report</button></div>
+            {caseReports[item.caseId] && <details style={{ marginTop: 8 }}><summary>View generated report · {caseReports[item.caseId].evidenceTimeline.length} timeline events</summary><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", maxHeight: 360, overflow: "auto", fontSize: 11 }}>{JSON.stringify(caseReports[item.caseId], null, 2)}</pre></details>}
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               {["investigating", "contained", "resolved", "false_positive"].map((status) => <button key={status} style={button} onClick={() => run(() => api.patch(`${ROOT}/cases/${encodeURIComponent(item.caseId)}`, { status }), `Case status updated to ${status}.`)}>{status.replace("_", " ")}</button>)}
             </div>
