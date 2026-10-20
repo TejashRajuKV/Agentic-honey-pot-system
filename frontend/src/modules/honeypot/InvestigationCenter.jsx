@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import api from "../../api/api";
 
 const ROOT = "/api/v1/investigations";
-const tabs = ["overview", "cases", "url triage", "rule lab", "feedback"];
+const tabs = ["overview", "cases", "copilot", "url triage", "rule lab", "feedback"];
 const card = { border: "1px solid var(--border-color, rgba(127,127,127,.28))", borderRadius: 12, padding: 16, minWidth: 0 };
 const field = { width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border-color, #8886)", background: "var(--panel-bg, transparent)", color: "inherit", font: "inherit" };
 const button = { padding: "9px 13px", borderRadius: 8, border: "1px solid var(--border-color, #8886)", background: "var(--panel-bg, transparent)", color: "inherit", cursor: "pointer", font: "inherit" };
@@ -26,6 +26,8 @@ export default function InvestigationCenter() {
   const [feedbackSession, setFeedbackSession] = useState("");
   const [feedbackLabel, setFeedbackLabel] = useState("uncertain");
   const [feedbackNote, setFeedbackNote] = useState("");
+  const [copilotSession, setCopilotSession] = useState("");
+  const [copilotResult, setCopilotResult] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -81,6 +83,16 @@ export default function InvestigationCenter() {
       setReplay(response.data?.data || null);
       setActive("rule lab");
     }, "Rule replay completed without changing production detection.");
+  };
+
+  const investigateSession = (event) => {
+    event.preventDefault();
+    if (!copilotSession.trim()) return setError("Enter the session ID to investigate.");
+    run(async () => {
+      const response = await api.post(`${ROOT}/copilot/investigate`, { sessionId: copilotSession.trim() });
+      setCopilotResult(response.data?.data || null);
+      setActive("copilot");
+    }, "Evidence-backed investigation completed.");
   };
 
   const submitFeedback = (event) => {
@@ -151,6 +163,20 @@ export default function InvestigationCenter() {
           </article>)}
           {!cases.length && <div style={card}>No cases yet. Create one when you have a session or indicator that needs investigation.</div>}
         </div>
+      </div>}
+
+      {active === "copilot" && <div style={{ display: "grid", gap: 14 }}>
+        <form onSubmit={investigateSession} style={{ ...card, display: "grid", gap: 10 }}>
+          <h3 style={{ margin: 0 }}>Evidence-backed investigation</h3>
+          <p style={{ margin: 0, opacity: .72 }}>Builds findings from stored conversation turns and audit events. It does not claim identity attribution or invent missing evidence.</p>
+          <input style={field} value={copilotSession} onChange={(e) => setCopilotSession(e.target.value)} maxLength={200} placeholder="Session ID" required />
+          <div><button style={button} type="submit">Investigate session</button></div>
+        </form>
+        {copilotResult && <div style={{ display: "grid", gap: 12 }}>
+          <div style={card}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}><h3 style={{ marginTop: 0 }}>{copilotResult.session.sessionId}</h3><strong>{Math.round((copilotResult.session.riskScore || 0) * 100)}% recorded risk</strong></div><p>{copilotResult.summary}</p><div style={{ fontSize: 12, opacity: .7 }}>Type: {copilotResult.session.scamType} · Phase: {copilotResult.session.phase} · Evidence records: {copilotResult.evidenceInventory.totalRecords}</div></div>
+          <div style={card}><h3 style={{ marginTop: 0 }}>Findings ({copilotResult.findings.length})</h3>{copilotResult.findings.map((finding, index) => <article key={`${finding.type}-${index}`} style={{ borderTop: "1px solid #8883", padding: "12px 0" }}><strong>{finding.type.replaceAll("_", " ").toUpperCase()}</strong><p>{finding.statement}</p><small>Severity: {finding.severity} · Confidence: {finding.confidence === null ? "not scored" : `${Math.round(finding.confidence * 100)}%`}</small><div style={{ marginTop: 6, fontSize: 12, opacity: .72 }}>{finding.evidence.length} evidence references: {finding.evidence.slice(0, 3).map((e) => e.reference).join(", ")}</div></article>)}{!copilotResult.findings.length && <p>No findings could be derived from the stored evidence.</p>}</div>
+          <div style={card}><h3 style={{ marginTop: 0 }}>Extracted indicators</h3>{Object.entries(copilotResult.indicators).map(([kind, values]) => <div key={kind} style={{ padding: "8px 0", borderTop: "1px solid #8883" }}><strong>{kind}</strong><div style={{ overflowWrap: "anywhere", opacity: .8 }}>{values.length ? values.join(", ") : "None recorded"}</div></div>)}<ul>{copilotResult.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul></div>
+        </div>}
       </div>}
 
       {active === "url triage" && <div style={{ display: "grid", gap: 14 }}>
