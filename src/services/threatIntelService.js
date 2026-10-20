@@ -387,46 +387,95 @@ class ThreatIntelligenceService {
      * Generate detailed threat report
      */
     async generateThreatReport(profileId) {
-        const profile = await ScammerProfile.findOne({ profileId });
-        if (!profile) {
+        if (typeof profileId !== 'string' || !profileId.trim() || profileId.length > 256) {
             return null;
         }
+        const profile = await ScammerProfile.findOne({ profileId: profileId.trim() }).lean();
+        if (!profile) return null;
 
-        // Get all sessions for this profile
-        const sessionIds = profile.sessions.map(s => s.sessionId);
-        const sessions = await Session.find({ sessionId: { $in: sessionIds } });
+        // Older profile documents may contain malformed or unbounded session arrays.
+        // Keep the report useful without turning one request into an unbounded export.
+        const sessionIds = [...new Set(
+            (Array.isArray(profile.sessions) ? profile.sessions : [])
+                .map((entry) => entry && entry.sessionId)
+                .filter((id) => typeof id === 'string' && id.trim() && id.length <= 256)
+        )].slice(-500);
+        const [sessions, sampleTurns] = await Promise.all([
+            sessionIds.length
+                ? Session.find({ sessionId: { $in: sessionIds } })
+                    .select('sessionId createdAt maxScamProbability highestPhase platform')
+                    .lean()
+                : [],
+            sessionIds.length
+                ? ConversationTurn.find({ sessionId: { $in: sessionIds.slice(-5) } })
+                    .select('sessionId role text timestamp turnIndex')
+                    .sort({ timestamp: -1, _id: -1 })
+                    .limit(50)
+                    .lean()
+                : []
+        ]);
 
-        // Get conversation samples
-        const conversationSamples = [];
-        for (const sessionId of sessionIds.slice(0, 5)) {
-            const turns = await ConversationTurn.find({ sessionId }).limit(10);
-            conversationSamples.push({ sessionId, turns });
+        const turnsBySession = new Map();
+        for (const turn of sampleTurns) {
+            if (!turn || typeof turn.sessionId !== 'string') continue;
+            if (!turnsBySession.has(turn.sessionId)) turnsBySession.set(turn.sessionId, []);
+            const group = turnsBySession.get(turn.sessionId);
+            if (group.length < 10) {
+                group.push({
+                    role: turn.role,
+                    text: typeof turn.text === 'string' ? turn.text.slice(0, 1500) : '',
+                    timestamp: turn.timestamp,
+                    turnIndex: turn.turnIndex
+                });
+            }
         }
+        const conversationSamples = [...turnsBySession.entries()].map(([id, turns]) => ({
+            sessionId: id,
+            turns: turns.reverse()
+        }));
+        const sessionById = new Map(sessions.map((session) => [session.sessionId, session]));
+        const sessionDetails = sessionIds
+            .map((id) => sessionById.get(id))
+            .filter(Boolean)
+            .map((session) => ({
+                sessionId: session.sessionId,
+                date: session.createdAt,
+                probability: session.maxScamProbability,
+                phase: session.highestPhase,
+                platform: session.platform
+            }));
+
+        const identifiers = profile.identifiers && typeof profile.identifiers === 'object'
+            ? Object.fromEntries(['upiIds', 'phoneNumbers', 'urls', 'emailAddresses'].map((field) => [
+                field,
+                [...new Set((Array.isArray(profile.identifiers[field]) ? profile.identifiers[field] : [])
+                    .filter((value) => typeof value === 'string' && value.length <= 2048))]
+                    .slice(-500)
+            ]))
+            : {};
 
         return {
             profile: {
                 id: profile.profileId,
-                identifiers: profile.identifiers,
+                identifiers,
                 riskScore: profile.riskScore,
                 status: profile.status,
                 firstSeen: profile.firstSeen,
                 lastSeen: profile.lastSeen
             },
-            behavioral: profile.behavioralFingerprint,
-            psychological: profile.psychologicalProfile,
-            intelligence: profile.intelligence,
+            behavioral: profile.behavioralFingerprint || {},
+            psychological: profile.psychologicalProfile || {},
+            intelligence: profile.intelligence || {},
             sessions: {
-                total: profile.sessions.length,
-                details: sessions.map(s => ({
-                    sessionId: s.sessionId,
-                    date: s.createdAt,
-                    probability: s.maxScamProbability,
-                    phase: s.highestPhase,
-                    platform: s.platform
-                }))
+                total: Array.isArray(profile.sessions) ? profile.sessions.length : 0,
+                details: sessionDetails
             },
             conversationSamples,
-            recommendations: this._generateRecommendations(profile)
+            recommendations: this._generateRecommendations({
+                ...profile,
+                intelligence: profile.intelligence || {},
+                psychologicalProfile: profile.psychologicalProfile || {}
+            })
         };
     }
 
