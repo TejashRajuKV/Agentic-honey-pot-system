@@ -21,6 +21,7 @@ const Session = require("../models/Session");
 
 // New advanced features
 const { checkKnownScammer, updateScammerIntelligence } = require("../services/crossSessionIntelligence");
+const { recordObservedIndicators } = require("../services/indicatorReputationService");
 const { selectPersona, applyPersona } = require("../../agent/personaSystem");
 const auditService = require("../services/auditService");
 const { runTurnPostProcessing } = require("../services/postProcessService");
@@ -396,6 +397,7 @@ const handleIncomingMessageUnlocked = async (req, res) => {
             // FEATURE 5: Update cross-session intelligence (only if scam detected)
             if (scamDetection.isScam && (intelligence.upiIds.length > 0 || intelligence.phoneNumbers.length > 0)) {
                 await updateScammerIntelligence(intelligence, sessionId, scamDetection);
+                await recordObservedIndicators(intelligence, sessionId, scamDetection);
                 await auditService.logIntelligenceExtracted(sessionId, intelligence);
             }
 
