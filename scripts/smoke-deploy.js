@@ -50,6 +50,12 @@ async function runSmoke(base, options = {}) {
     check("Root health endpoint", root.status === 200 && root.json?.status === "ok",
         `HTTP ${root.status}; JSON health response expected`);
 
+    const consolePage = await request(fetchImpl, base, "/", { headers: { Accept: "text/html" } });
+    check("Web console is served", consolePage.status === 200
+        && consolePage.contentType.toLowerCase().includes("text/html")
+        && /<div[^>]+id=["']root["']/.test(consolePage.text),
+    `HTTP ${consolePage.status}; content-type=${consolePage.contentType || "missing"}; React root expected`);
+
     const messages = await request(fetchImpl, base, "/api/v1/messages", { headers: { Accept: "application/json" } });
     check("Message API discovery", messages.status === 200 && messages.json?.status === "success",
         `HTTP ${messages.status}`);
