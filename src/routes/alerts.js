@@ -15,6 +15,10 @@ function boundedAlertLimit(value) {
 function safeConfigResponse(config) {
     const data = config.toObject ? config.toObject() : { ...config };
     if (data.auth) data.auth = { ...data.auth, token: data.auth.token ? '••••••••' : '' };
+
+    // Alert history is served by /history. Do not duplicate potentially sensitive
+    // extracted indicators and webhook payloads in the general configuration response.
+    delete data.history;
     return data;
 }
 
@@ -196,7 +200,7 @@ router.get('/history', async (req, res) => {
         const history = await alertService.getAlertHistory(limit);
         res.json({ status: 'success', data: history, count: history.length });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to load alert history' });
     }
 });
 
@@ -209,7 +213,7 @@ router.get('/stats', async (req, res) => {
         const stats = await alertService.getAlertStats();
         res.json({ status: 'success', data: stats });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to load alert statistics' });
     }
 });
 
