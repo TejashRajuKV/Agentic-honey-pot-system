@@ -1,0 +1,79 @@
+name: Runtime verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-tests:
+    name: Build, unit and API integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' "
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      PORT: 3000
+      MONGODB_URI: mongodb://127.0.0.1:27017/cyberrakshak_test
+      API_KEY: ci-test-api-key-not-for-production-0123456789
+      CONSOLE_PASSWORD: ci-only-console-password
+      CONSOLE_SESSION_SECRET: ci-only-session-secret-long-enough-for-tests-0123456789
+      ML_PORT: 5050
+      PYTHONUNBUFFERED: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Install frontend dependencies
+        run: npm --prefix frontend ci
+
+      - name: Install ML runtime dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Check JavaScript syntax
+        run: find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Run focused service and security tests
+        run: |
+          npm run test:threat-network
+          npm run test:webhook-policy
+          npm run test:rate-limit
+          npm run test:console-auth
+          npm run test:readiness -- 1
+
+      - name: Run end-to-end API integration tests
+        run: npm test
