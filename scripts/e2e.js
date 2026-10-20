@@ -226,6 +226,21 @@ async function main() {
         ok(validStatus.status === 200, `schema-valid incident status returned ${validStatus.status}`);
         ok(cappedLimit.status === 200, `excessive incident limit should be capped, got ${cappedLimit.status}`);
     });
+    await check("cross-session webhook payload preserves both incident and legacy match fields", async () => {
+        const alertService = require("../src/services/alertService");
+        const incidentPayload = alertService.formatWebhookPayload("cross_session", {
+            incidentId: "INC-E2E", riskScore: 91, scamType: "upi_fraud",
+            sessions: ["session-a", "session-b"], identifiers: { upiIds: ["test@upi"] },
+        }).alert;
+        ok(incidentPayload.incidentId === "INC-E2E", "incident id missing from cross-session payload");
+        ok(incidentPayload.riskScore === 91 && incidentPayload.scamType === "upi_fraud", "incident risk metadata missing");
+        ok(incidentPayload.sessions.length === 2 && incidentPayload.identifiers.upiIds.length === 1, "incident sessions or identifiers missing");
+        const legacyPayload = alertService.formatWebhookPayload("cross_session", {
+            profileId: "profile-e2e", matchCount: 3, sessions: ["a", "b", "c"], sharedIdentifiers: ["test@upi"],
+        }).alert;
+        ok(legacyPayload.profileId === "profile-e2e" && legacyPayload.matchCount === 3, "legacy profile/match fields missing");
+        ok(legacyPayload.sharedIdentifiers[0] === "test@upi", "legacy shared identifiers missing");
+    });
     await check("alert history pagination rejects invalid limits and caps large requests", async () => {
         const invalid = await get("/alerts/history?limit=not-a-number");
         const zero = await get("/alerts/history?limit=0");
