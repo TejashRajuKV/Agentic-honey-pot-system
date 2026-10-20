@@ -32,7 +32,7 @@ router.get('/config', async (req, res) => {
 
         res.json({ status: 'success', data: safeConfigResponse(config) });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to load alert configuration' });
     }
 });
 
@@ -61,6 +61,18 @@ router.put('/config', async (req, res) => {
             if (body[field] !== undefined && (!body[field] || typeof body[field] !== 'object' || Array.isArray(body[field]))) {
                 return res.status(400).json({ status: 'error', message: `${field} must be an object` });
             }
+        }
+        const triggerFields = ['criticalRisk', 'newScammer', 'crossSessionMatch', 'qualityDrop', 'highVelocityAttack', 'multipleVictims'];
+        if (body.triggers !== undefined) {
+            for (const field of triggerFields) {
+                if (body.triggers[field] !== undefined && typeof body.triggers[field] !== 'boolean') {
+                    return res.status(400).json({ status: 'error', message: `triggers.${field} must be a boolean` });
+                }
+            }
+        }
+        if (body.filters?.rateLimit !== undefined &&
+            (!body.filters.rateLimit || typeof body.filters.rateLimit !== 'object' || Array.isArray(body.filters.rateLimit))) {
+            return res.status(400).json({ status: 'error', message: 'filters.rateLimit must be an object' });
         }
         if (body.auth?.type !== undefined && !['none', 'bearer', 'api_key', 'basic', 'hmac'].includes(body.auth.type)) {
             return res.status(400).json({ status: 'error', message: 'auth.type is not supported' });
@@ -130,7 +142,7 @@ router.put('/config', async (req, res) => {
         res.json({ status: 'success', data: safeConfigResponse(config), message: 'Configuration updated' });
     } catch (error) {
         const isValidationError = /Webhook URL|hostname|HTTPS|credentials|IP address|resolve/i.test(error.message);
-        res.status(isValidationError ? 400 : 500).json({ status: 'error', message: error.message });
+        res.status(isValidationError ? 400 : 500).json({ status: 'error', message: isValidationError ? error.message : 'Unable to update alert configuration' });
     }
 });
 
@@ -169,7 +181,7 @@ router.post('/test', async (req, res) => {
         res.json({ status: 'success', data: result });
     } catch (error) {
         const isValidationError = /Webhook URL|hostname|HTTPS|credentials|IP address|resolve/i.test(error.message);
-        res.status(isValidationError ? 400 : 500).json({ status: 'error', message: error.message });
+        res.status(isValidationError ? 400 : 500).json({ status: isValidationError ? 'error' : 'error', message: isValidationError ? error.message : 'Webhook test failed' });
     }
 });
 
