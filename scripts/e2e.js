@@ -248,12 +248,20 @@ async function main() {
         const badAuth = await call("PUT", "/alerts/config", { auth: { type: "unknown" } });
         const badRetry = await call("PUT", "/alerts/config", { retryConfig: [] });
         const badHeaderName = await call("PUT", "/alerts/config", { auth: { type: "api_key", headerName: "X-API-Key\\r\\nInjected: yes" } });
+        const badRetryCount = await call("PUT", "/alerts/config", { retryConfig: { maxRetries: 999 } });
+        const badRetryDelay = await call("PUT", "/alerts/config", { retryConfig: { retryDelay: 1 } });
+        const badRateLimit = await call("PUT", "/alerts/config", { filters: { rateLimit: { maxAlertsPerHour: -1 } } });
+        const badFilterList = await call("PUT", "/alerts/config", { filters: { scamTypes: "all" } });
         ok(badBody.status === 400, `array body returned ${badBody.status}`);
         ok(badEnabled.status === 400, `non-boolean enabled returned ${badEnabled.status}`);
         ok(badChannels.status === 400, `unsupported channel returned ${badChannels.status}`);
         ok(badAuth.status === 400, `unsupported auth type returned ${badAuth.status}`);
         ok(badRetry.status === 400, `array retryConfig returned ${badRetry.status}`);
         ok(badHeaderName.status === 400, `invalid auth header name returned ${badHeaderName.status}`);
+        ok(badRetryCount.status === 400, `excessive retry count returned ${badRetryCount.status}`);
+        ok(badRetryDelay.status === 400, `unsafe retry delay returned ${badRetryDelay.status}`);
+        ok(badRateLimit.status === 400, `negative rate limit returned ${badRateLimit.status}`);
+        ok(badFilterList.status === 400, `non-array scamTypes returned ${badFilterList.status}`);
     });
     await check("webhook test endpoint rejects malformed payloads and auth values", async () => {
         const badBody = await call("POST", "/alerts/test", []);
