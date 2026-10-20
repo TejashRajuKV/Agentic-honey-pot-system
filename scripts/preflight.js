@@ -21,6 +21,9 @@ function required(name, options = {}) {
     if (options.minLength && value.length < options.minLength) {
         errors.push(`${name} must be at least ${options.minLength} characters long`);
     }
+    if (options.minBytes && Buffer.byteLength(value, "utf8") < options.minBytes) {
+        errors.push(`${name} must be at least ${options.minBytes} bytes long`);
+    }
     if (options.reject && options.reject.some((item) => value.trim().toLowerCase() === item)) {
         errors.push(`${name} still contains a placeholder value`);
     }
@@ -46,14 +49,14 @@ if (production) {
         reject: ["change-me", "your_secure_api_key_here", "changeme"]
     });
     required("CONSOLE_PASSWORD", { minLength: 12 });
-    required("CONSOLE_SESSION_SECRET", { minLength: 32 });
+    required("CONSOLE_SESSION_SECRET", { minBytes: 32 });
 
     const callback = (process.env.EVALUATION_CALLBACK_URL || "").trim();
     if (callback) {
         try {
             const url = new URL(callback);
             if (url.protocol !== "https:" || url.username || url.password || !url.hostname) {
-                errors.push("EVALUATION_CALLBACK_URL must be a public HTTPS URL without embedded credentials");
+                errors.push("EVALUATION_CALLBACK_URL must be a valid HTTPS URL without embedded credentials");
             }
         } catch {
             errors.push("EVALUATION_CALLBACK_URL must be a valid HTTPS URL");
@@ -66,7 +69,7 @@ if (production) {
         for (const bin of candidates) {
             const probe = spawnSync(bin, [
                 "-c",
-                "import flask, flask_cors, dotenv; print('python-ml-dependencies-ok')"
+                "import sys; import flask, flask_cors, dotenv; assert sys.version_info >= (3, 10); print('python-ml-dependencies-ok')"
             ], { encoding: "utf8", timeout: 10000 });
             if (!probe.error && probe.status === 0) {
                 pythonReady = true;
