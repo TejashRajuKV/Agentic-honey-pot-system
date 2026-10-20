@@ -3,6 +3,18 @@ const express = require('express');
 const router = express.Router();
 const qualityService = require('../services/qualityService');
 
+function validSessionId(value) {
+    return typeof value === 'string' && value.trim().length > 0 && value.length <= 200
+        && !/[\\/\\0-\\x1f\\x7f]/.test(value);
+}
+
+function boundedLimit(value, fallback = 100, maximum = 500) {
+    if (value === undefined || value === '') return fallback;
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1) return null;
+    return Math.min(parsed, maximum);
+}
+
 /**
  * @route GET /api/v1/quality/session/:sessionId
  * @desc Get quality metrics for a session
@@ -10,12 +22,13 @@ const qualityService = require('../services/qualityService');
 router.get('/session/:sessionId', async (req, res) => {
     try {
         const QualityMetrics = require('../models/QualityMetrics');
+        if (!validSessionId(req.params.sessionId)) return res.status(400).json({ status: 'error', message: 'Invalid sessionId' });
         const metrics = await QualityMetrics.find({ sessionId: req.params.sessionId })
-            .sort({ turnNumber: 1 });
+            .sort({ turnNumber: 1 }).limit(5000);
 
         res.json({ status: 'success', data: metrics, count: metrics.length });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to retrieve quality data' });
     }
 });
 
@@ -25,6 +38,7 @@ router.get('/session/:sessionId', async (req, res) => {
  */
 router.get('/report/:sessionId', async (req, res) => {
     try {
+        if (!validSessionId(req.params.sessionId)) return res.status(400).json({ status: 'error', message: 'Invalid sessionId' });
         const report = await qualityService.generateQualityReport(req.params.sessionId);
         res.json({ status: 'success', data: report });
     } catch (error) {
@@ -39,11 +53,12 @@ router.get('/report/:sessionId', async (req, res) => {
 router.get('/metrics', async (req, res) => {
     try {
         const QualityMetrics = require('../models/QualityMetrics');
-        const { limit = 100 } = req.query;
+        const limit = boundedLimit(req.query.limit, 100, 500);
+        if (limit === null) return res.status(400).json({ status: 'error', message: 'limit must be a positive integer' });
 
         const metrics = await QualityMetrics.find()
             .sort({ timestamp: -1 })
-            .limit(parseInt(limit));
+            .limit(limit);
 
         // Calculate aggregate metrics
         const avgScores = {
@@ -88,6 +103,7 @@ router.get('/metrics', async (req, res) => {
  */
 router.get('/repetition/:sessionId', async (req, res) => {
     try {
+        if (!validSessionId(req.params.sessionId)) return res.status(400).json({ status: 'error', message: 'Invalid sessionId' });
         const repetition = await qualityService.detectRepetition(req.params.sessionId);
         res.json({ status: 'success', data: repetition });
     } catch (error) {
