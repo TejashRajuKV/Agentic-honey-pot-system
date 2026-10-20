@@ -81,6 +81,17 @@ async function main() {
         ok(r.status === 404 && r.type.includes("json"), `got ${r.status} ${r.type}`);
     });
 
+    await check("breach lookup rejects malformed email values safely", async () => {
+        const numeric = await post("/console/breach-check", { email: 123 });
+        const object = await post("/console/breach-check", { email: { address: "person@example.com" } });
+        const oversized = await post("/console/breach-check", { email: "a".repeat(400) });
+        const malformed = await post("/console/breach-check", { email: "not-an-email" });
+        ok(numeric.status === 400, `numeric email returned ${numeric.status}`);
+        ok(object.status === 400, `object email returned ${object.status}`);
+        ok(oversized.status === 400, `oversized email returned ${oversized.status}`);
+        ok(malformed.status === 400, `malformed email returned ${malformed.status}`);
+    });
+
     console.log("\nML detection modules (via /api/v1/ml/*)");
     await check("ML health separates model readiness from rule-based fallbacks", async () => {
         const r = await get("/ml/health");
