@@ -111,6 +111,7 @@ async function startSink() {
 async function startGateway(port, extraEnv = {}, opts = {}) {
     const { spawn } = require("child_process");
     let log = "";
+    let lastHealth = { api: null, db: null, ml: null };
     const sink = extraEnv.EVALUATION_CALLBACK_URL ? null : await startSink();
     const child = spawn(process.execPath, ["src/server.js"], {
         cwd: ROOT,
@@ -120,22 +121,51 @@ async function startGateway(port, extraEnv = {}, opts = {}) {
     child.stdout.on("data", (b) => { log += b.toString(); });
     child.stderr.on("data", (b) => { log += b.toString(); });
     const base = `http://127.0.0.1:${port}`;
+    const mlBase = process.env.CYBERRAKSHAK_URL || `http://127.0.0.1:${process.env.ML_PORT || 5050}`;
     const start = Date.now();
     while (Date.now() - start < 60000) {
-        const dbReady = opts.waitDb === false || log.includes("Connected to MongoDB");
-        if (dbReady) {
-            try {
-                if (opts.waitMl === false) { const r = await fetch(`${base}/ping`); if (r.ok) break; }
-                else { const r = await fetch(`${base}/api/v1/system/status`); if ((await r.json()).data?.ml?.reachable) break; }
-            } catch { /* keep waiting */ }
+        try {
+            const apiResponse = await fetch(`${base}/api/v1/health`, { signal: AbortSignal.timeout(1500) });
+            lastHealth.api = apiResponse.status;
+            if (apiResponse.ok) {
+                const apiHealth = await apiResponse.json().catch(() => ({}));
+                lastHealth.db = apiHealth.db || "unknown";
+                const dbReady = opts.waitDb === false || apiHealth.db === "connected";
+
+                let mlReady = opts.waitMl === false;
+                if (!mlReady) {
+                    const mlResponse = await fetch(`${mlBase}/api/health`, { signal: AbortSignal.timeout(1500) });
+                    lastHealth.ml = mlResponse.status;
+                    mlReady = mlResponse.ok;
+                } else {
+                    const ping = await fetch(`${base}/ping`, { signal: AbortSignal.timeout(1500) });
+                    mlReady = ping.ok;
+                }
+
+                if (dbReady && mlReady) break;
+            }
+        } catch {
+            // Keep probing while the gateway, MongoDB, and ML engine start.
         }
-        if (child.exitCode !== null) { if (sink) sink.close(); throw new Error(`gateway exited early (code ${child.exitCode}):
-${log.slice(-800)}`); }
+        if (child.exitCode !== null) {
+            if (sink) sink.close();
+            throw new Error(`gateway exited early (code=${child.exitCode}); last health=${JSON.stringify(lastHealth)}:
+${log.slice(-1200)}`);
+        }
         await sleep(500);
     }
-    if (Date.now() - start >= 60000) { child.kill(); throw new Error(`gateway not ready after 60s:
-${log.slice(-800)}`); }
-    return { base, log: () => log, callbacks: sink ? sink.received : [], stop: () => { try { child.kill(); } catch { /* gone */ } if (sink) sink.close(); } };
+    if (Date.now() - start >= 60000) {
+        child.kill();
+        if (sink) sink.close();
+        throw new Error(`gateway not ready after 60s; last health=${JSON.stringify(lastHealth)}:
+${log.slice(-1200)}`);
+    }
+    return {
+        base,
+        log: () => log,
+        callbacks: sink ? sink.received : [],
+        stop: () => { try { child.kill(); } catch { /* gone */ } if (sink) sink.close(); }
+    };
 }
 
 /** Does `obj` contain the dotted path? `[]` means "each element of an array" (first element is checked). */
