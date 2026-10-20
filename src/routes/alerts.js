@@ -68,6 +68,11 @@ router.put('/config', async (req, res) => {
         if (body.auth?.token !== undefined && typeof body.auth.token !== 'string') {
             return res.status(400).json({ status: 'error', message: 'auth.token must be a string' });
         }
+        if (body.auth?.headerName !== undefined &&
+            (typeof body.auth.headerName !== 'string' || body.auth.headerName.length > 100 ||
+             !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(body.auth.headerName))) {
+            return res.status(400).json({ status: 'error', message: 'auth.headerName must be a valid HTTP header name of at most 100 characters' });
+        }
         if (body.webhookUrl) await validateWebhookUrl(body.webhookUrl);
 
         // Only accept documented configuration fields; do not allow clients to overwrite history/stats.
@@ -104,10 +109,28 @@ router.put('/config', async (req, res) => {
  */
 router.post('/test', async (req, res) => {
     try {
-        const { webhookUrl, auth } = req.body;
+        const body = req.body;
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
+            return res.status(400).json({ status: 'error', message: 'Request body must be a JSON object' });
+        }
+        const { webhookUrl, auth } = body;
 
-        if (!webhookUrl) {
-            return res.status(400).json({ status: 'error', message: 'webhookUrl required' });
+        if (typeof webhookUrl !== 'string' || !webhookUrl.trim()) {
+            return res.status(400).json({ status: 'error', message: 'webhookUrl must be a non-empty string' });
+        }
+        if (auth !== undefined && (!auth || typeof auth !== 'object' || Array.isArray(auth))) {
+            return res.status(400).json({ status: 'error', message: 'auth must be an object' });
+        }
+        if (auth?.type !== undefined && !['none', 'bearer', 'api_key', 'basic', 'hmac'].includes(auth.type)) {
+            return res.status(400).json({ status: 'error', message: 'auth.type is not supported' });
+        }
+        if (auth?.token !== undefined && typeof auth.token !== 'string') {
+            return res.status(400).json({ status: 'error', message: 'auth.token must be a string' });
+        }
+        if (auth?.headerName !== undefined &&
+            (typeof auth.headerName !== 'string' || auth.headerName.length > 100 ||
+             !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(auth.headerName))) {
+            return res.status(400).json({ status: 'error', message: 'auth.headerName must be a valid HTTP header name of at most 100 characters' });
         }
         await validateWebhookUrl(webhookUrl);
 
