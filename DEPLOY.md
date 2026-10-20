@@ -24,8 +24,8 @@ This document provides step-by-step deployment instructions for the Agentic Hone
    - Get your connection string
 
 3. **Whitelist IP Addresses**
-   - In Network Access, allow access from anywhere (0.0.0.0/0)
-   - Or add your deployment platform's IP ranges
+   - Prefer adding your deployment platform's documented outbound IP ranges where available.
+   - If the platform has dynamic outbound IPs, use a private network/VPC peering option when supported. Only use `0.0.0.0/0` as a deliberate last resort, with strong database credentials and TLS; it exposes the database endpoint to connection attempts from any IP.
 
 ### 2. Deploy to Render
 
@@ -101,10 +101,9 @@ This document provides step-by-step deployment instructions for the Agentic Hone
    heroku create honeypot-backend
    ```
 
-3. **Add MongoDB Add-on**
-   ```bash
-   heroku addons:create mongodb:sandbox
-   ```
+3. **Configure MongoDB**
+   - Use a supported managed MongoDB provider such as MongoDB Atlas and create a database user with least-privilege access.
+   - Set `MONGODB_URI` in Heroku Config Vars to the provider's connection string. Do not commit the URI to Git.
 
 4. **Set Environment Variables**
    ```bash
@@ -130,6 +129,16 @@ npm run release:check
 
 This builds the React console and checks the production database URI, API key, console credentials, callback URL syntax, frontend artifact, and Python ML dependencies (unless the ML service is external). It does not replace a deployed smoke test or service-specific health checks.
 
+## Deployed smoke verification
+
+After deployment finishes and DNS/TLS are ready, run the read-only smoke checks against the public service. This checks API health, MongoDB connectivity, the message discovery route, rejection of a message request without an API key, and the liveness ping. It does not submit or store a test message.
+
+```bash
+npm run smoke:deploy -- https://your-app.onrender.com
+```
+
+Or set `DEPLOY_URL` and run `npm run smoke:deploy`. The command requires HTTPS except for localhost. A successful result is a useful deployment gate, but it does not prove every optional integration or ML model is operational.
+
 ## 🔒 Security Checklist
 
 - [ ] Change the API key to a unique random secret of at least 32 characters
@@ -143,18 +152,13 @@ This builds the React console and checks the production database URI, API key, c
 ## 🧪 Testing Deployed API
 
 ```bash
-# Test health endpoint
-curl https://your-app.onrender.com/
+# Run read-only deployed smoke checks (does not create a session)
+npm run smoke:deploy -- https://your-app.onrender.com
 
-# Test message endpoint
-curl -X POST https://your-app.onrender.com/api/v1/messages \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: your_api_key" \
-  -d '{
-    "sessionId": "test_001",
-    "message": "Your account will be blocked",
-    "platform": "test"
-  }'
+# Optional: inspect health manually
+curl -H 'Accept: application/json' https://your-app.onrender.com/api/v1/health
+
+# Avoid posting sample messages to production unless you intend to create a real session.
 ```
 
 ## 📊 Monitoring
@@ -201,4 +205,4 @@ Most platforms auto-deploy on push to main branch.
 
 ---
 
-**Deployment complete! Your Agentic Honey-Pot System is now live.** 🎉
+**Deployment is verified only after the deployed smoke checks pass and platform logs show no startup errors.**
