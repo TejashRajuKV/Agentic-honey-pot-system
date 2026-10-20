@@ -138,7 +138,8 @@ router.post("/cases", async (req, res) => {
     }
     try {
         const created = await InvestigationCase.create({
-            caseId: `CASE-${crypto.randomUUID()}`, title, summary, severity, sessionIds, indicators, tags, createdBy
+            caseId: `CASE-${crypto.randomUUID()}`, title, summary, severity, sessionIds, indicators, tags, createdBy,
+            activity: [{ event: "case_created", detail: "Investigation case created", actor: createdBy }]
         });
         res.status(201).json({ status: "success", data: created });
     } catch { res.status(500).json({ status: "error", message: "Unable to create case" }); }
@@ -188,8 +189,16 @@ router.patch("/cases/:caseId", async (req, res) => {
         if (!allowed.indicators) return res.status(400).json({ status: "error", message: "Invalid indicators" });
     }
     if (!Object.keys(allowed).length) return res.status(400).json({ status: "error", message: "No supported fields supplied" });
+    const actor = req.body?.updatedBy === undefined ? "analyst" : boundedString(req.body.updatedBy, 120);
+    if (!actor) return res.status(400).json({ status: "error", message: "Invalid updatedBy" });
+    const event = allowed.status ? "status_changed" : allowed.assignedTo !== undefined ? "assigned" : "case_updated";
+    const detail = allowed.status ? "Status changed to " + allowed.status : allowed.assignedTo !== undefined ? "Assigned to " + (allowed.assignedTo || "unassigned") : "Case fields updated";
     try {
-        const updated = await InvestigationCase.findOneAndUpdate({ caseId }, { $set: allowed }, { new: true, runValidators: true });
+        const updated = await InvestigationCase.findOneAndUpdate(
+            { caseId },
+            { $set: allowed, $push: { activity: { event, detail, actor } } },
+            { new: true, runValidators: true }
+        );
         if (!updated) return res.status(404).json({ status: "error", message: "Case not found" });
         res.json({ status: "success", data: updated });
     } catch { res.status(500).json({ status: "error", message: "Unable to update case" }); }
@@ -226,7 +235,7 @@ router.post("/cases/:caseId/notes", async (req, res) => {
     if (!text || !author) return res.status(400).json({ status: "error", message: "A note and valid author are required" });
     try {
         const updated = await InvestigationCase.findOneAndUpdate(
-            { caseId: req.params.caseId }, { $push: { notes: { $each: [{ text, author }], $slice: -500 } } },
+            { caseId: req.params.caseId }, { $push: { notes: { $each: [{ text, author }], $slice: -500 }, activity: { event: "note_added", detail: "Analyst note added", actor: author } } },
             { new: true, runValidators: true }
         );
         if (!updated) return res.status(404).json({ status: "error", message: "Case not found" });
@@ -248,7 +257,7 @@ router.post("/cases/:caseId/evidence", async (req, res) => {
     try {
         const updated = await InvestigationCase.findOneAndUpdate(
             { caseId: req.params.caseId },
-            { $push: { evidence: { $each: [{ type, reference, label, addedBy, contentHash }], $slice: -1000 } } },
+            { $push: { evidence: { $each: [{ type, reference, label, addedBy, contentHash }], $slice: -1000 }, activity: { event: "evidence_added", detail: "Evidence reference added (" + type + ")", actor: addedBy } } },
             { new: true, runValidators: true }
         );
         if (!updated) return res.status(404).json({ status: "error", message: "Case not found" });
@@ -467,7 +476,7 @@ router.post("/playbooks/execute", async (req, res) => {
             const sessionIds = boundedStringArray(req.body?.sessionIds, 100, 200);
             const indicators = boundedStringArray(req.body?.indicators, 100, 2048);
             if (!title || summary === null || !SEVERITIES.includes(severity) || !sessionIds || !indicators) return res.status(400).json({ status: "error", message: "Invalid create_case payload" });
-            const created = await InvestigationCase.create({ caseId: `CASE-${crypto.randomUUID()}`, title, summary, severity, sessionIds, indicators, createdBy: approvedBy });
+            const created = await InvestigationCase.create({ caseId: `CASE-${crypto.randomUUID()}`, title, summary, severity, sessionIds, indicators, createdBy: approvedBy, activity: [{ event: "playbook_created", detail: "Case created by approved playbook", actor: approvedBy }] });
             resultReference = created.caseId;
             safeSummary = "Created an internal investigation case";
         } else {
