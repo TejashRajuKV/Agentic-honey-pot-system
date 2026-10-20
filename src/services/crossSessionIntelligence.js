@@ -41,7 +41,7 @@ async function checkKnownScammer(upiIds = [], phoneNumbers = []) {
 
         return { isKnown: false };
     } catch (error) {
-        console.error('Error checking known scammer:', error);
+        console.error('Known-scammer lookup failed');
         return { isKnown: false };
     }
 }
@@ -79,7 +79,7 @@ async function updateScammerIntelligence(intelligence, sessionId, scamContext) {
             );
         }
     } catch (error) {
-        console.error('Error updating scammer intelligence:', error);
+        console.error('Scammer intelligence update failed');
     }
 }
 
@@ -148,7 +148,7 @@ async function upsertScammerIntel(identifier, sessionId, confidence, riskLevel, 
             console.log(`🆕 New scammer tracked (${identifier.upiId ? 'UPI' : 'phone'} identifier)`);
         }
     } catch (error) {
-        console.error('Error upserting scammer intel:', error);
+        console.error('Scammer intelligence upsert failed');
     }
 }
 
@@ -161,7 +161,7 @@ async function getScammerReport(upiId) {
     try {
         return await ScammerIntelligence.findOne({ upiId });
     } catch (error) {
-        console.error('Error getting scammer report:', error);
+        console.error('Scammer report lookup failed');
         return null;
     }
 }
