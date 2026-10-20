@@ -24,7 +24,8 @@
     "test:rule-lab": "node tests/rule-lab.js",
     "test:simulation-service": "node tests/simulation-service.js",
     "test:privacy-service": "node tests/privacy-service.js",
-    "test:behavioral-similarity": "node tests/behavioral-similarity.js"
+    "test:behavioral-similarity": "node tests/behavioral-similarity.js",
+    "test:adaptive-persona": "node tests/adaptive-persona.js"
   },
   "keywords": [
     "honeypot",
