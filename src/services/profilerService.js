@@ -242,8 +242,11 @@ class ProfilerService {
      * Analyze temporal patterns
      */
     _analyzeTimePatterns(messages) {
-        const hours = messages.map(m => new Date(m.timestamp).getHours());
-        const days = messages.map(m => new Date(m.timestamp).getDay());
+        const validDates = messages
+            .map((message) => new Date(message.timestamp))
+            .filter((date) => Number.isFinite(date.getTime()));
+        const hours = validDates.map((date) => date.getHours());
+        const days = validDates.map((date) => date.getDay());
 
         return {
             activeHours: [...new Set(hours)].sort((a, b) => a - b),
@@ -315,16 +318,18 @@ class ProfilerService {
         let urgencyScore = 0;
 
         for (let i = 0; i < messages.length; i++) {
-            const text = messages[i].text.toLowerCase();
+            const text = typeof messages[i].text === 'string' ? messages[i].text.toLowerCase() : '';
+            // Use a non-negative recency weight: long conversations can exceed five
+            // turns, and the old (5 - i) expression made later messages subtract
+            // from the pressure score, potentially reversing the signal.
+            const recencyWeight = Math.max(1, 5 - i);
 
-            // Check for urgent keywords
             if (urgentKeywords.some(k => text.includes(k))) {
-                urgencyScore += (5 - i) * 10; // Earlier = higher score
+                urgencyScore += recencyWeight * 10;
             }
 
-            // Check for credential requests
             if (credentialRequests.some(k => text.includes(k))) {
-                urgencyScore += (5 - i) * 20;
+                urgencyScore += recencyWeight * 20;
             }
         }
 
