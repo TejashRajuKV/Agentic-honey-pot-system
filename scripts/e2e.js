@@ -504,11 +504,12 @@ async function main() {
         const badSession = await get("/console/stix?sessionId=a&sessionId=b");
         const blankSession = await get("/console/stix?sessionId=%20%20");
         const badDownload = await get("/console/stix?download=yes");
-        const validDownload = await get("/console/stix?download=true");
+        const validDownload = await fetch(`${V1}/console/stix?download=true`);
         ok(badSession.status === 400, `repeated sessionId returned ${badSession.status}`);
         ok(blankSession.status === 400, `blank sessionId returned ${blankSession.status}`);
         ok(badDownload.status === 400, `invalid download flag returned ${badDownload.status}`);
-        ok(validDownload.status === 200 && /attachment/.test(validDownload.type), "download=true should return an attachment");
+        ok(validDownload.status === 200 && /attachment/.test(validDownload.headers.get("content-disposition") || ""),
+            "download=true should return an attachment");
     });
     await check("STIX 2.1 export: valid bundle with indicators, campaign and relationships", async () => {
         const res = await fetch(`${V1}/console/stix`);
