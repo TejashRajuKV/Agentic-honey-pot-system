@@ -35,9 +35,10 @@ This document provides step-by-step deployment instructions for the Agentic Hone
    - Connect your GitHub repository
 
 2. **Configure Build Settings**
-   - Build Command: `npm install`
+   - Build Command: `npm install && npm run build`
    - Start Command: `npm start`
-   - Environment: `Node`
+   - Runtime requirements: Node.js 18+, Python 3.10+, and the packages in `requirements.txt` if the gateway will supervise the ML engine.
+   - If the host cannot run Python, deploy the ML service separately, install its Python dependencies there, and set `ML_AUTO_START=false` plus `CYBERRAKSHAK_URL` on the gateway.
 
 3. **Set Environment Variables**
    ```
@@ -45,7 +46,9 @@ This document provides step-by-step deployment instructions for the Agentic Hone
    API_KEY=your_secure_api_key_here
    PORT=3000
    NODE_ENV=production
-   EVALUATION_CALLBACK_URL=https://your-evaluation-endpoint.com/callback
+   CONSOLE_PASSWORD=use-a-unique-password-at-least-12-characters
+   CONSOLE_SESSION_SECRET=generate-at-least-32-random-bytes
+   # Leave EVALUATION_CALLBACK_URL unset to use the required default evaluator.
    LLM_API_KEY=your_llm_key (optional)
    ```
 
@@ -75,7 +78,9 @@ This document provides step-by-step deployment instructions for the Agentic Hone
    API_KEY=your_secure_api_key_here
    PORT=${{PORT}}
    NODE_ENV=production
-   EVALUATION_CALLBACK_URL=https://your-evaluation-endpoint.com/callback
+   CONSOLE_PASSWORD=use-a-unique-password-at-least-12-characters
+   CONSOLE_SESSION_SECRET=generate-at-least-32-random-bytes
+   # Leave EVALUATION_CALLBACK_URL unset to use the required default evaluator.
    ```
 
 5. **Deploy**
@@ -110,6 +115,16 @@ This document provides step-by-step deployment instructions for the Agentic Hone
    ```bash
    git push heroku main
    ```
+
+## Release preflight
+
+After configuring production environment variables and installing the frontend and Python dependencies, run:
+
+```bash
+npm run release:check
+```
+
+This builds the React console and checks the production database URI, API key, console credentials, callback URL syntax, frontend artifact, and Python ML dependencies (unless the ML service is external). It does not replace a deployed smoke test or service-specific health checks.
 
 ## 🔒 Security Checklist
 
@@ -173,7 +188,10 @@ Most platforms auto-deploy on push to main branch.
 | `MONGODB_URI` | Yes | MongoDB connection string | `mongodb+srv://...` |
 | `API_KEY` | Yes | API authentication key | `secure_random_key_123` |
 | `NODE_ENV` | Yes | Environment mode | `production` |
-| `EVALUATION_CALLBACK_URL` | No | Callback endpoint URL | `https://eval.com/callback` |
+| `EVALUATION_CALLBACK_URL` | No | Public HTTPS callback override; leave unset to use the default evaluator | *(unset)* |
+| `CONSOLE_PASSWORD` | Yes in production | Console password (at least 12 characters) | *(secret)* |
+| `CONSOLE_SESSION_SECRET` | Yes in production | HMAC signing secret (at least 32 bytes) | *(secret)* |
+| `CYBERRAKSHAK_URL` | If ML is external | Base URL of separately hosted ML service | `http://127.0.0.1:5050` |
 | `LLM_API_KEY` | No | LLM API key (optional) | `gemini_key_xxx` |
 
 ---
