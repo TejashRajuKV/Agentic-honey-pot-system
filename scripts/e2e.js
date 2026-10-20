@@ -343,11 +343,15 @@ async function main() {
         const badIdentifiers = await post("/console/risk", { upiIds: "not-an-array" });
         const tooManyIdentifiers = await post("/console/risk", { phoneNumbers: Array.from({ length: 51 }, (_, i) => `+9100000000${i}`) });
         const tooLongApp = await post("/console/risk", { app: "A".repeat(301) });
+        const invalidBehavior = await post("/console/risk", { message: "Suspicious message", behavior: { hour: 3.5, amount: 100, transactions: 1, new_device: 1, failed_logins: 0 } });
+        const incompleteBehavior = await post("/console/risk", { behavior: { hour: 3, amount: 100 } });
         ok(badBody.status === 400, `array body should be rejected, got ${badBody.status}`);
         ok(badMessage.status === 400, `structured message should be rejected, got ${badMessage.status}`);
         ok(badIdentifiers.status === 400, `string identifier list should be rejected, got ${badIdentifiers.status}`);
         ok(tooManyIdentifiers.status === 400, `oversized identifier list should be rejected, got ${tooManyIdentifiers.status}`);
         ok(tooLongApp.status === 413, `oversized app name should be rejected, got ${tooLongApp.status}`);
+        ok(invalidBehavior.status === 400, `fractional behavior hour should be rejected, got ${invalidBehavior.status}`);
+        ok(incompleteBehavior.status === 400, `incomplete behavior data should be rejected, got ${incompleteBehavior.status}`);
     });
     await check("URL intelligence: brand impersonation flagged, official domain clean, HTTPS not a driver", async () => {
         const bad = (await post("/ml/phishing", { url: "http://sbi-kyc-update.xyz/login" })).data;
