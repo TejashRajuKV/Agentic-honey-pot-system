@@ -177,6 +177,42 @@ router.get("/intelligence/summary", async (req, res) => {
 router.post("/risk", async (req, res) => {
     try {
         const body = req.body || {};
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
+            return res.status(400).json({ status: "error", message: "Request body must be a JSON object" });
+        }
+
+        const textFields = [
+            ["message", 4000],
+            ["url", 4096],
+            ["app", 300],
+        ];
+        for (const [field, maxLength] of textFields) {
+            const value = body[field];
+            if (value !== undefined && value !== null && value !== "" && typeof value !== "string") {
+                return res.status(400).json({ status: "error", message: `Field '${field}' must be a string` });
+            }
+            if (typeof value === "string" && value.length > maxLength) {
+                return res.status(413).json({ status: "error", message: `Field '${field}' exceeds ${maxLength} characters` });
+            }
+        }
+
+        const identifiers = [];
+        for (const field of ["upiIds", "phoneNumbers"]) {
+            const value = body[field];
+            if (value === undefined || value === null) continue;
+            if (!Array.isArray(value)) {
+                return res.status(400).json({ status: "error", message: `Field '${field}' must be an array of strings` });
+            }
+            if (value.length > 50 || value.some((item) => typeof item !== "string" || item.length > 200)) {
+                return res.status(400).json({ status: "error", message: `Field '${field}' must contain at most 50 strings of 200 characters or fewer` });
+            }
+            identifiers.push(...value);
+        }
+        if (body.behavior !== undefined && body.behavior !== null &&
+            (typeof body.behavior !== "object" || Array.isArray(body.behavior))) {
+            return res.status(400).json({ status: "error", message: "Field 'behavior' must be an object" });
+        }
+
         const result = await riskFusion.assess({
             message: body.message, url: body.url, app: body.app,
             upiIds: Array.isArray(body.upiIds) ? body.upiIds : [],
