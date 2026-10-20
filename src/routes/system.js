@@ -34,13 +34,14 @@ router.get("/status", async (req, res) => {
 
     const llm = Boolean(process.env.LLM_API_KEY);
     const modules = ml.health?.modules || {};
+    const fallbacks = ml.health?.fallbacks || {};
 
     res.json({
         status: "success",
         data: {
             timestamp: new Date().toISOString(),
             api: { online: true, version: "2.1.0", uptimeSec: Math.round(process.uptime()) },
-            ml: { ...ml, latencyMs: mlLatencyMs, modules },
+            ml: { ...ml, latencyMs: mlLatencyMs, modules, fallbacks },
             db,
             agent: { llmConfigured: llm, mode: llm ? "LLM + rule-based fallback" : "rule-based" },
             alerts,
