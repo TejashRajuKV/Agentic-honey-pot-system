@@ -5,7 +5,7 @@ const languageService = require('../services/languageService');
 
 function validSessionId(value) {
     return typeof value === 'string' && value.trim().length > 0 && value.length <= 200
-        && !value.includes('/') && !value.includes('\\\\')
+        && !value.includes('/') && !value.includes('\\')
         && ![...value].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127);
 }
 
