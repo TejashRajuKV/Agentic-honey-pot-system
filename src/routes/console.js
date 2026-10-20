@@ -336,7 +336,15 @@ router.post("/incidents/:id/resolve", async (req, res) => {
 /** GET /api/v1/console/sessions?limit=&scam=true — recent honeypot sessions */
 router.get("/sessions", async (req, res) => {
     try {
-        const limit = Math.min(parseInt(req.query.limit || "30", 10) || 30, 100);
+        const rawLimit = req.query.limit;
+        const parsedLimit = rawLimit === undefined ? 30 : Number(rawLimit);
+        if (!Number.isInteger(parsedLimit) || parsedLimit < 1) {
+            return res.status(400).json({ status: "error", message: "limit must be a positive integer" });
+        }
+        if (req.query.scam !== undefined && !["true", "false"].includes(req.query.scam)) {
+            return res.status(400).json({ status: "error", message: "scam must be true or false" });
+        }
+        const limit = Math.min(parsedLimit, 100);
         const query = req.query.scam === "true" ? { scamEverDetected: true } : {};
         const sessions = await Session.find(query).sort({ lastActiveAt: -1 }).limit(limit).lean();
 
