@@ -135,9 +135,10 @@ Values are loaded from environment variables. See [`.env.example`](.env.example)
 | `CONSOLE_SESSION_SECRET` | HMAC signing secret for console sessions; at least 32 random bytes in production |
 | `LLM_API_KEY` | Optional key for LLM-generated agent responses; rule-based fallback may be used when absent |
 | `EVALUATION_CALLBACK_URL` | Optional evaluator callback override for staging/testing; otherwise the configured default is used |
-| `ML_PORT` | Python ML service port; default `5050` |
+| `ML_PORT` | Python ML service port; default `5050` (takes precedence over the shared `PORT`) |
 | `CYBERRAKSHAK_URL` | ML service base URL; defaults to loopback |
 | `ML_AUTO_START` | Set to `false` to manage the Python service separately |
+| `DEBUG` | Flask debug mode; defaults to `false` and should remain disabled in deployed environments |
 | `PYTHON_BIN` | Optional Python executable override |
 | `ML_TIMEOUT_MS` | Timeout for optional ML bridge calls; default `2500` ms |
 | `ALLOWED_ORIGINS` | Comma-separated list of allowed browser origins |
@@ -236,7 +237,7 @@ Older material under `docs/cyberrakshak/` may describe earlier standalone compon
 - Treat this as a development project until its security controls and deployment setup have been reviewed.
 - Do not expose unauthenticated console, ML, analytics, intelligence, profile, alert, or configuration endpoints to untrusted networks.
 - Use strong secrets and keep them out of source control, screenshots, logs, and frontend bundles.
-- Restrict evaluator/webhook callback destinations to trusted hosts and review any endpoint that can change callback configuration to prevent server-side request forgery or misuse.
+- Evaluator callback overrides must use public HTTPS destinations; the callback client validates DNS results, pins the validated IP for the request, and does not follow redirects. Keep the default GUVI endpoint unless an alternate evaluator is explicitly required.
 - Keep the ML service bound to loopback unless remote access is deliberately secured.
 - Collect only the data required for analysis, restrict access to stored evidence, and define retention and deletion policies.
 - Use the platform for authorized defensive testing and investigation. Do not treat model scores or shared indicators as conclusive proof of malicious activity or identity.
