@@ -119,6 +119,11 @@ async function main() {
         });
         ok(r.status === 200 && r.data.confidence >= 50, JSON.stringify(r.data));
     });
+    await check("blacklisted loan-app result and explanation agree on final risk", async () => {
+        const r = await post("/ml/loan", { app_name: "CashNow", instant_approval: false });
+        ok(r.status === 200 && r.data.confidence >= 90 && r.data.label === "HIGH RISK", JSON.stringify(r.data));
+        ok(/HIGH RISK/.test(r.data.explanation?.summary || ""), "explanation did not reflect the final high-risk override");
+    });
     await check("threat analyzer (multi-vector fusion)", async () => {
         const r = await post("/ml/threat", { message: "Share your OTP now", url: "http://secure-login-bank-india.com/update", app: "" });
         ok(r.status === 200 && r.data.overall_confidence != null, JSON.stringify(r.data).slice(0, 200));
