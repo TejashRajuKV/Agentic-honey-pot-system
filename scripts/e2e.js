@@ -329,6 +329,18 @@ async function main() {
         const e = await post("/console/risk", {});
         ok(e.data.data.verdict === "NO_INPUT", "empty input should return NO_INPUT");
     });
+    await check("risk fusion rejects malformed and oversized inputs", async () => {
+        const badBody = await post("/console/risk", ["unexpected", "array"]);
+        const badMessage = await post("/console/risk", { message: { text: "not a string" } });
+        const badIdentifiers = await post("/console/risk", { upiIds: "not-an-array" });
+        const tooManyIdentifiers = await post("/console/risk", { phoneNumbers: Array.from({ length: 51 }, (_, i) => `+9100000000${i}`) });
+        const tooLongApp = await post("/console/risk", { app: "A".repeat(301) });
+        ok(badBody.status === 400, `array body should be rejected, got ${badBody.status}`);
+        ok(badMessage.status === 400, `structured message should be rejected, got ${badMessage.status}`);
+        ok(badIdentifiers.status === 400, `string identifier list should be rejected, got ${badIdentifiers.status}`);
+        ok(tooManyIdentifiers.status === 400, `oversized identifier list should be rejected, got ${tooManyIdentifiers.status}`);
+        ok(tooLongApp.status === 413, `oversized app name should be rejected, got ${tooLongApp.status}`);
+    });
     await check("URL intelligence: brand impersonation flagged, official domain clean, HTTPS not a driver", async () => {
         const bad = (await post("/ml/phishing", { url: "http://sbi-kyc-update.xyz/login" })).data;
         ok(bad.confidence >= 80 && bad.signals.some((s) => s.signal === "brand_impersonation"), "impersonation not flagged");
