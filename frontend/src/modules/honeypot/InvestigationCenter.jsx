@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import api from "../../api/api";
 
 const ROOT = "/api/v1/investigations";
-const tabs = ["overview", "cases", "copilot", "url triage", "rule lab", "simulation", "privacy", "feedback"];
+const tabs = ["overview", "cases", "copilot", "url triage", "rule lab", "simulation", "privacy", "quality drift", "feedback"];
 const card = { border: "1px solid var(--border-color, rgba(127,127,127,.28))", borderRadius: 12, padding: 16, minWidth: 0 };
 const field = { width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border-color, #8886)", background: "var(--panel-bg, transparent)", color: "inherit", font: "inherit" };
 const button = { padding: "9px 13px", borderRadius: 8, border: "1px solid var(--border-color, #8886)", background: "var(--panel-bg, transparent)", color: "inherit", cursor: "pointer", font: "inherit" };
@@ -32,6 +32,8 @@ export default function InvestigationCenter() {
   const [privacyText, setPrivacyText] = useState("Contact me at example@example.com or use token=abc123.");
   const [redactionResult, setRedactionResult] = useState(null);
   const [retentionPreview, setRetentionPreview] = useState(null);
+  const [similarityResult, setSimilarityResult] = useState(null);
+  const [driftResult, setDriftResult] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -88,6 +90,18 @@ export default function InvestigationCenter() {
       setActive("rule lab");
     }, "Rule replay completed without changing production detection.");
   };
+
+  const compareBehavior = () => run(async () => {
+    const response = await api.get(`${ROOT}/sessions/${encodeURIComponent(copilotSession.trim())}/similarities`);
+    setSimilarityResult(response.data?.data || null);
+    setActive("copilot");
+  }, "Cross-session lexical comparison completed.");
+
+  const loadDrift = () => run(async () => {
+    const response = await api.get(`${ROOT}/quality/drift`);
+    setDriftResult(response.data?.data || null);
+    setActive("quality drift");
+  }, "Detection quality signals loaded.");
 
   const runSimulation = () => run(async () => {
     const response = await api.post(`${ROOT}/simulation/run`, {});
@@ -193,10 +207,12 @@ export default function InvestigationCenter() {
           <p style={{ margin: 0, opacity: .72 }}>Builds findings from stored conversation turns and audit events. It does not claim identity attribution or invent missing evidence.</p>
           <input style={field} value={copilotSession} onChange={(e) => setCopilotSession(e.target.value)} maxLength={200} placeholder="Session ID" required />
           <div><button style={button} type="submit">Investigate session</button></div>
+          <div><button style={button} type="button" onClick={compareBehavior} disabled={!copilotSession.trim() || loading}>Compare behavior with other sessions</button></div>
         </form>
         {copilotResult && <div style={{ display: "grid", gap: 12 }}>
           <div style={card}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}><h3 style={{ marginTop: 0 }}>{copilotResult.session.sessionId}</h3><strong>{Math.round((copilotResult.session.riskScore || 0) * 100)}% recorded risk</strong></div><p>{copilotResult.summary}</p><div style={{ fontSize: 12, opacity: .7 }}>Type: {copilotResult.session.scamType} · Phase: {copilotResult.session.phase} · Evidence records: {copilotResult.evidenceInventory.totalRecords}</div></div>
           <div style={card}><h3 style={{ marginTop: 0 }}>Findings ({copilotResult.findings.length})</h3>{copilotResult.findings.map((finding, index) => <article key={`${finding.type}-${index}`} style={{ borderTop: "1px solid #8883", padding: "12px 0" }}><strong>{finding.type.replaceAll("_", " ").toUpperCase()}</strong><p>{finding.statement}</p><small>Severity: {finding.severity} · Confidence: {finding.confidence === null ? "not scored" : `${Math.round(finding.confidence * 100)}%`}</small><div style={{ marginTop: 6, fontSize: 12, opacity: .72 }}>{finding.evidence.length} evidence references: {finding.evidence.slice(0, 3).map((e) => e.reference).join(", ")}</div></article>)}{!copilotResult.findings.length && <p>No findings could be derived from the stored evidence.</p>}</div>
+          {similarityResult && <div style={card}><h3 style={{ marginTop: 0 }}>Similar wording signals</h3><p>Compared with {similarityResult.comparedSessions} candidate sessions. This is lexical similarity only, not proof of shared authorship.</p>{similarityResult.results.map((item) => <div key={item.sessionId} style={{ borderTop: "1px solid #8883", padding: "9px 0" }}><strong>{item.sessionId}</strong> · {Math.round(item.similarity * 100)}% overlap<div style={{ fontSize: 12, opacity: .7 }}>Shared terms: {item.sharedTerms.join(", ") || "none"}</div></div>)}{!similarityResult.results.length && <p>No non-zero lexical overlaps found in the sampled sessions.</p>}</div>}
           <div style={card}><h3 style={{ marginTop: 0 }}>Extracted indicators</h3>{Object.entries(copilotResult.indicators).map(([kind, values]) => <div key={kind} style={{ padding: "8px 0", borderTop: "1px solid #8883" }}><strong>{kind}</strong><div style={{ overflowWrap: "anywhere", opacity: .8 }}>{values.length ? values.join(", ") : "None recorded"}</div></div>)}<ul>{copilotResult.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul></div>
         </div>}
       </div>}
@@ -230,6 +246,11 @@ export default function InvestigationCenter() {
       {active === "privacy" && <div style={{ display: "grid", gap: 14 }}>
         <div style={card}><h3 style={{ marginTop: 0 }}>Privacy redaction preview</h3><p style={{ opacity: .72 }}>Mask common email, phone, UPI and sensitive URL parameter values before sharing text with an external service.</p><textarea style={{ ...field, minHeight: 120 }} value={privacyText} onChange={(e) => setPrivacyText(e.target.value)} maxLength={50000}/><div style={{ marginTop: 10 }}><button style={button} onClick={runRedaction} disabled={loading}>Preview redaction</button></div>{redactionResult && <div style={{ marginTop: 12 }}><strong>Redacted output</strong><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{redactionResult.redactedText}</pre><small>Redactions: {Object.entries(redactionResult.counts).map(([key,value]) => `${key} ${value}`).join(" · ")}</small></div>}</div>
         <div style={card}><h3 style={{ marginTop: 0 }}>Retention policy preview</h3><p style={{ opacity: .72 }}>The default target is 365 days. This preview estimates old records; it does not delete anything.</p><button style={button} onClick={previewRetention} disabled={loading}>Preview records older than policy</button>{retentionPreview && <div style={{ marginTop: 12 }}><p>Cutoff: {new Date(retentionPreview.cutoff).toLocaleString()} · {retentionPreview.retentionDays} days</p>{Object.entries(retentionPreview.candidateCounts).map(([key,value]) => <div key={key} style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #8883", padding: "7px 0" }}><span>{key.replaceAll(/([A-Z])/g, " $1")}</span><strong>{value}</strong></div>)}<strong>Total candidate records: {retentionPreview.totalCandidateRecords}</strong><p><small>{retentionPreview.note}</small></p></div>}</div>
+      </div>}
+
+      {active === "quality drift" && <div style={{ display: "grid", gap: 14 }}>
+        <div style={card}><h3 style={{ marginTop: 0 }}>Detection quality signals</h3><p style={{ opacity: .72 }}>Uses analyst feedback from the last 90 days. It is a monitoring signal, not a statistically validated model-drift detector.</p><button style={button} onClick={loadDrift} disabled={loading}>Refresh quality signals</button></div>
+        {driftResult && <><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 12 }}>{[["TRUE POSITIVES", driftResult.counts.true_positive || 0],["FALSE POSITIVES",driftResult.counts.false_positive || 0],["MISSED DETECTIONS",driftResult.counts.missed_detection || 0],["FALSE POSITIVE RATE",driftResult.falsePositiveRate === null ? "N/A" : `${Math.round(driftResult.falsePositiveRate * 100)}%`]].map(([label,value]) => <div key={label} style={card}><div style={{ fontSize: 11, opacity: .65 }}>{label}</div><div style={{ fontSize: 26, fontWeight: 700, marginTop: 8 }}>{value}</div></div>)}</div><div style={card}><strong>Signal: {driftResult.signal.replaceAll("_", " ")}</strong><h3>Monthly review trend</h3>{driftResult.monthlyTrend.map((item) => <div key={item.month} style={{ borderTop: "1px solid #8883", padding: "8px 0" }}>{item.month} · TP {item.truePositives} · FP {item.falsePositives} · missed {item.missedDetections}</div>)}<h3>By model version</h3>{driftResult.byModelVersion.map((item) => <div key={item.modelVersion} style={{ borderTop: "1px solid #8883", padding: "8px 0" }}>{item.modelVersion} · {item.reviews} reviews · {item.falsePositives} false positives · avg reviewed confidence {item.averageReviewedConfidence == null ? "N/A" : Math.round(item.averageReviewedConfidence * 100) + "%"}</div>)}<ul>{driftResult.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul></div></>}
       </div>}
 
       {active === "feedback" && <div style={{ display: "grid", gap: 14 }}>
