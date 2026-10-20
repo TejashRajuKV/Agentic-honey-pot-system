@@ -27,7 +27,7 @@ const ENDPOINTS = {
     ANALYTICS_DASHBOARD: `${V1}/analytics/dashboard`,
     ANALYTICS_TRENDS: `${V1}/analytics/trends`,
     ANALYTICS_TOP_SCAMMERS: `${V1}/analytics/top-scammers`,
-    INTELLIGENCE_SUMMARY: `${V1}/intelligence/summary`,
+    INTELLIGENCE_SUMMARY: `${V1}/console/intelligence/summary`,
 };
 
 export default ENDPOINTS;
