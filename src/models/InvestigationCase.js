@@ -10,6 +10,13 @@ const evidenceSchema = new Schema({
     addedAt: { type: Date, default: Date.now }
 }, { _id: true });
 
+const activitySchema = new Schema({
+    event: { type: String, enum: ["case_created", "case_updated", "status_changed", "assigned", "note_added", "evidence_added", "playbook_created"], required: true },
+    detail: { type: String, required: true, maxlength: 500 },
+    actor: { type: String, maxlength: 120, default: "analyst" },
+    timestamp: { type: Date, default: Date.now }
+}, { _id: true });
+
 const noteSchema = new Schema({
     text: { type: String, required: true, maxlength: 5000 },
     author: { type: String, maxlength: 120, default: "analyst" },
@@ -27,6 +34,7 @@ const caseSchema = new Schema({
     indicators: { type: [String], default: [] },
     evidence: { type: [evidenceSchema], default: [] },
     notes: { type: [noteSchema], default: [] },
+    activity: { type: [activitySchema], default: [] },
     tags: { type: [String], default: [] },
     createdBy: { type: String, default: "analyst", maxlength: 120 },
     resolvedAt: { type: Date, default: null }
