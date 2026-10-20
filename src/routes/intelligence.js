@@ -46,7 +46,7 @@ router.get('/threats', async (req, res) => {
 
         res.json({ status: 'success', data: threats, count: threats.length });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process threat intelligence request' });
     }
 });
 
@@ -56,6 +56,7 @@ router.get('/threats', async (req, res) => {
  */
 router.get('/profile/:id', async (req, res) => {
     try {
+        if (typeof req.params.id !== 'string' || !req.params.id.trim() || req.params.id.length > 200 || /[\\/\\0-\\x1f\\x7f]/.test(req.params.id)) return res.status(400).json({ status: 'error', message: 'Invalid profile ID' });
         const report = await threatIntel.generateThreatReport(req.params.id);
 
         if (!report) {
@@ -76,7 +77,7 @@ router.post('/correlate', async (req, res) => {
     try {
         const { sessionId } = req.body || {};
 
-        if (typeof sessionId !== 'string' || !sessionId) {
+        if (typeof sessionId !== 'string' || !sessionId.trim() || sessionId.length > 200) {
             return res.status(400).json({ status: 'error', message: 'sessionId (string) required' });
         }
 
