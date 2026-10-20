@@ -116,9 +116,13 @@ async function main() {
         const invalidDevice = await post("/ml/behavior", { hour: 3, amount: 100, transactions: 1, new_device: 7, failed_logins: 0 });
         const fractionalHour = await post("/ml/behavior", { hour: 3.5, amount: 100, transactions: 1, new_device: 1, failed_logins: 0 });
         const stringCount = await post("/ml/behavior", { hour: 3, amount: 100, transactions: "1", new_device: 1, failed_logins: 0 });
+        const excessiveAmount = await post("/ml/behavior", { hour: 3, amount: 1e100, transactions: 1, new_device: 1, failed_logins: 0 });
+        const excessiveCount = await post("/ml/behavior", { hour: 3, amount: 100, transactions: 1000001, new_device: 1, failed_logins: 0 });
         ok(invalidDevice.status === 400, JSON.stringify(invalidDevice.data));
         ok(fractionalHour.status === 400, JSON.stringify(fractionalHour.data));
         ok(stringCount.status === 400, JSON.stringify(stringCount.data));
+        ok(excessiveAmount.status === 400, JSON.stringify(excessiveAmount.data));
+        ok(excessiveCount.status === 400, JSON.stringify(excessiveCount.data));
     });
     await check("loan rules + loan scorer", async () => {
         const rules = await get("/ml/loan/rules");
