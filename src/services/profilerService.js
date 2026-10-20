@@ -556,10 +556,14 @@ class ProfilerService {
             identifiers.emailAddresses.push(...emails.filter((value) => !knownUpiIds.has(value.toLowerCase())));
         }
 
-        // Deduplicate
-        identifiers.upiIds = [...new Set(identifiers.upiIds)];
-        identifiers.phoneNumbers = [...new Set(identifiers.phoneNumbers)];
-        identifiers.urls = [...new Set(identifiers.urls)];
+        // Deduplicate and bound every identifier class. Email addresses used to
+        // be the only class left unbounded, allowing repeated/large conversations
+        // to grow profile documents indefinitely.
+        for (const field of Object.keys(identifiers)) {
+            identifiers[field] = [...new Set(identifiers[field]
+                .filter((value) => typeof value === 'string' && value.trim())
+                .map((value) => value.trim()))].slice(-500);
+        }
 
         return identifiers;
     }
