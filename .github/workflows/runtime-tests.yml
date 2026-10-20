@@ -72,6 +72,7 @@ jobs:
           npm run test:rate-limit
           npm run test:console-auth
           npm run test:smoke-deploy
+          npm run test:investigation-analysis
           npm run test:readiness -- 1
 
       - name: Run end-to-end API integration tests
