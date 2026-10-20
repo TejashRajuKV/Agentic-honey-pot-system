@@ -12,6 +12,7 @@ const PlaybookRun = require("../models/PlaybookRun");
 const ruleLab = require("../services/ruleLabService");
 const simulationService = require("../services/simulationService");
 const privacyService = require("../services/privacyService");
+const behaviorSimilarity = require("../services/behavioralSimilarityService");
 
 const SEVERITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 const CASE_STATUSES = ["open", "investigating", "contained", "resolved", "false_positive"];
@@ -537,6 +538,60 @@ router.post("/simulation/run", async (req, res) => {
     } catch (error) {
         res.status(400).json({ status: "error", message: error instanceof TypeError ? error.message : "Unable to run simulation" });
     }
+});
+
+router.get("/sessions/:sessionId/similarities", async (req, res) => {
+    const sessionId = boundedString(req.params.sessionId, 200, { required: true });
+    const limit = boundedLimit(req.query.limit, 10, 30);
+    if (!sessionId || /[\\/\0-\x1f\x7f]/.test(sessionId)) return res.status(400).json({ status: "error", message: "Invalid session ID" });
+    if (limit === null) return res.status(400).json({ status: "error", message: "limit must be a positive integer" });
+    try {
+        const targetTurns = await ConversationTurn.find({ sessionId, role: "user" }).sort({ timestamp: -1 }).limit(100).select("text timestamp").lean();
+        if (!targetTurns.length) return res.status(404).json({ status: "error", message: "No user messages found for this session" });
+        const target = behaviorSimilarity.fingerprint(targetTurns.map((turn) => turn.text));
+        const candidates = await ConversationTurn.find({ sessionId: { $ne: sessionId }, role: "user" }).sort({ timestamp: -1 }).limit(5000).select("sessionId text timestamp").lean();
+        const groups = new Map();
+        for (const turn of candidates) {
+            if (!groups.has(turn.sessionId) && groups.size >= 500) continue;
+            const group = groups.get(turn.sessionId) || { messages: [], lastSeenAt: turn.timestamp };
+            if (group.messages.length < 30) group.messages.push(turn.text);
+            if (new Date(turn.timestamp) > new Date(group.lastSeenAt)) group.lastSeenAt = turn.timestamp;
+            groups.set(turn.sessionId, group);
+        }
+        const similar = [...groups.entries()].map(([candidateId, group]) => {
+            const compared = behaviorSimilarity.compareFingerprints(target, behaviorSimilarity.fingerprint(group.messages));
+            return { sessionId: candidateId, similarity: compared.score, sharedTerms: compared.sharedTerms, sharedTermCount: compared.sharedCount, lastSeenAt: group.lastSeenAt, comparedMessages: group.messages.length };
+        }).filter((item) => item.similarity > 0).sort((a, b) => b.similarity - a.similarity).slice(0, limit);
+        res.json({ status: "success", data: {
+            targetSessionId: sessionId, comparedSessions: groups.size, results: similar,
+            caveat: "Lexical overlap is a weak investigative lead, not proof of common authorship or identity. Generic or copied wording can create false matches."
+        } });
+    } catch { res.status(500).json({ status: "error", message: "Unable to compare session behavior" }); }
+});
+
+router.get("/quality/drift", async (_req, res) => {
+    try {
+        const since = new Date(Date.now() - 90 * 86400000);
+        const [labels, trend, byModel] = await Promise.all([
+            AnalystFeedback.aggregate([{ $match: { reviewedAt: { $gte: since } } }, { $group: { _id: "$label", count: { $sum: 1 } } }]),
+            AnalystFeedback.aggregate([
+                { $match: { reviewedAt: { $gte: since } } },
+                { $group: { _id: { year: { $year: "$reviewedAt" }, month: { $month: "$reviewedAt" } }, truePositives: { $sum: { $cond: [{ $eq: ["$label", "true_positive"] }, 1, 0] } }, falsePositives: { $sum: { $cond: [{ $eq: ["$label", "false_positive"] }, 1, 0] } }, missedDetections: { $sum: { $cond: [{ $eq: ["$label", "missed_detection"] }, 1, 0] } } } },
+                { $sort: { "_id.year": 1, "_id.month": 1 } }
+            ]),
+            AnalystFeedback.aggregate([{ $match: { reviewedAt: { $gte: since } } }, { $group: { _id: { $ifNull: ["$modelVersion", "unspecified"] }, reviews: { $sum: 1 }, falsePositives: { $sum: { $cond: [{ $eq: ["$label", "false_positive"] }, 1, 0] } }, averageConfidence: { $avg: "$confidenceAtReview" } } }, { $sort: { reviews: -1 } }, { $limit: 20 }])
+        ]);
+        const counts = Object.fromEntries(labels.map((row) => [row._id, row.count]));
+        const decided = (counts.true_positive || 0) + (counts.false_positive || 0);
+        const falsePositiveRate = decided ? Number(((counts.false_positive || 0) / decided).toFixed(4)) : null;
+        res.json({ status: "success", data: {
+            windowDays: 90, since: since.toISOString(), counts, falsePositiveRate,
+            signal: falsePositiveRate === null ? "insufficient_review_data" : falsePositiveRate >= 0.2 ? "review_false_positive_rate" : "no_threshold_breach",
+            monthlyTrend: trend.map((row) => ({ month: `${row._id.year}-${String(row._id.month).padStart(2, "0")}`, truePositives: row.truePositives, falsePositives: row.falsePositives, missedDetections: row.missedDetections })),
+            byModelVersion: byModel.map((row) => ({ modelVersion: row._id, reviews: row.reviews, falsePositives: row.falsePositives, averageReviewedConfidence: row.averageConfidence })),
+            limitations: ["This is a feedback-based quality signal, not a statistically validated drift detector.", "Unreviewed sessions and uncertain labels are not ground truth."]
+        } });
+    } catch { res.status(500).json({ status: "error", message: "Unable to calculate detection quality signals" }); }
 });
 
 router.post("/copilot/investigate", async (req, res) => {
