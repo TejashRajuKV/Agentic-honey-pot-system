@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+import math
 from utils.model_loader import get_models
 from utils.response_formatter import format_error
 from modules.behavior_monitor import check_behavior
@@ -81,9 +82,24 @@ def behavior_detect():
                 format_error("behavior_monitor", "Hour must be 0-23")
             ), 400
 
+        if not math.isfinite(behavior_data["amount"]):
+            return jsonify(
+                format_error("behavior_monitor", "Amount must be a finite number")
+            ), 400
+
         if behavior_data["amount"] < 0:
             return jsonify(
                 format_error("behavior_monitor", "Amount cannot be negative")
+            ), 400
+
+        if behavior_data["transactions"] < 0 or behavior_data["failed_logins"] < 0:
+            return jsonify(
+                format_error("behavior_monitor", "Transaction and failed-login counts cannot be negative")
+            ), 400
+
+        if behavior_data["new_device"] not in (0, 1):
+            return jsonify(
+                format_error("behavior_monitor", "new_device must be 0 or 1")
             ), 400
 
         # ── Get loaded models ──
