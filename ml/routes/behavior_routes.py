@@ -59,22 +59,27 @@ def behavior_detect():
                 )
             ), 400
 
-        # ── Validate field types ──
-        try:
-            behavior_data = {
-                "hour":          int(data["hour"]),
-                "amount":        float(data["amount"]),
-                "transactions":  int(data["transactions"]),
-                "new_device":    int(data["new_device"]),
-                "failed_logins": int(data["failed_logins"])
-            }
-        except (ValueError, TypeError):
-            return jsonify(
-                format_error(
-                    "behavior_monitor",
-                    "All fields must be numbers"
-                )
-            ), 400
+        # ── Validate field types without silently truncating values ──
+        integer_fields = ("hour", "transactions", "new_device", "failed_logins")
+        for field in integer_fields:
+            value = data[field]
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or not value.is_integer() if isinstance(value, float) else False):
+                return jsonify(format_error("behavior_monitor", f"Field '{field}' must be an integer")), 400
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                return jsonify(format_error("behavior_monitor", f"Field '{field}' must be an integer")), 400
+
+        amount = data["amount"]
+        if isinstance(amount, bool) or not isinstance(amount, (int, float)):
+            return jsonify(format_error("behavior_monitor", "Field 'amount' must be a number")), 400
+
+        behavior_data = {
+            "hour": int(data["hour"]),
+            "amount": float(amount),
+            "transactions": int(data["transactions"]),
+            "new_device": int(data["new_device"]),
+            "failed_logins": int(data["failed_logins"])
+        }
 
         # ── Validate ranges ──
         if not 0 <= behavior_data["hour"] <= 23:
