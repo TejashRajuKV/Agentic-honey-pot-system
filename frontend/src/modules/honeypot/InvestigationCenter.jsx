@@ -19,6 +19,9 @@ export default function InvestigationCenter() {
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [severity, setSeverity] = useState("MEDIUM");
+  const [assignees, setAssignees] = useState({});
+  const [caseNotes, setCaseNotes] = useState({});
+  const [caseEvidence, setCaseEvidence] = useState({});
   const [url, setUrl] = useState("");
   const [urlResult, setUrlResult] = useState(null);
   const [samples, setSamples] = useState("Urgent: verify your account immediately\nVisit https://example.com/verify\nPlease pay to sample123@bank\nNormal customer question");
@@ -194,6 +197,11 @@ export default function InvestigationCenter() {
             </div>
             {item.summary && <p style={{ opacity: .8 }}>{item.summary}</p>}
             <div style={{ fontSize: 12, opacity: .7 }}>{(item.sessionIds || []).length} sessions · {(item.indicators || []).length} indicators · {(item.evidence || []).length} evidence items · updated {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "—"}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 8, marginTop: 12 }}>
+              <div style={{ display: "flex", gap: 6 }}><input style={field} value={assignees[item.caseId] ?? item.assignedTo ?? ""} onChange={(e) => setAssignees((prev) => ({ ...prev, [item.caseId]: e.target.value }))} maxLength={120} placeholder="Assign to analyst"/><button style={button} onClick={() => run(() => api.patch(`${ROOT}/cases/${encodeURIComponent(item.caseId)}`, { assignedTo: assignees[item.caseId] ?? item.assignedTo ?? "" }), "Case assignment updated.")}>Assign</button></div>
+              <div style={{ display: "flex", gap: 6 }}><input style={field} value={caseNotes[item.caseId] || ""} onChange={(e) => setCaseNotes((prev) => ({ ...prev, [item.caseId]: e.target.value }))} maxLength={5000} placeholder="Add analyst note"/><button style={button} onClick={() => { const note = (caseNotes[item.caseId] || "").trim(); if (!note) return setError("Enter a note before saving."); run(() => api.post(`${ROOT}/cases/${encodeURIComponent(item.caseId)}/notes`, { text: note }), "Case note added."); setCaseNotes((prev) => ({ ...prev, [item.caseId]: "" })); }}>Add note</button></div>
+              <div style={{ display: "flex", gap: 6 }}><input style={field} value={caseEvidence[item.caseId] || ""} onChange={(e) => setCaseEvidence((prev) => ({ ...prev, [item.caseId]: e.target.value }))} maxLength={500} placeholder="Session / indicator reference"/><button style={button} onClick={() => { const reference = (caseEvidence[item.caseId] || "").trim(); if (!reference) return setError("Enter an evidence reference."); run(() => api.post(`${ROOT}/cases/${encodeURIComponent(item.caseId)}/evidence`, { type: "session", reference, label: "Analyst-linked evidence" }), "Evidence reference attached."); setCaseEvidence((prev) => ({ ...prev, [item.caseId]: "" })); }}>Attach evidence</button></div>
+            </div>
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               {["investigating", "contained", "resolved", "false_positive"].map((status) => <button key={status} style={button} onClick={() => run(() => api.patch(`${ROOT}/cases/${encodeURIComponent(item.caseId)}`, { status }), `Case status updated to ${status}.`)}>{status.replace("_", " ")}</button>)}
             </div>
