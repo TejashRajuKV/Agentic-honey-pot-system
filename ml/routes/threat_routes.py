@@ -79,7 +79,10 @@ def threat_analyze():
         # ── Run URL check ──
         if not is_empty(url):
             url_threat = _check_url(url)
-            scores["scam_radar"] = {"confidence": url_threat["confidence"]}
+            # Keep URL evidence separate from message-scam evidence. Writing to
+            # "scam_radar" here used to overwrite the message score whenever both
+            # inputs were supplied, silently changing the overall result.
+            scores["url_risk"] = {"confidence": url_threat["confidence"]}
             if url_threat["confidence"] >= 40:
                 threats.append(url_threat)
 
