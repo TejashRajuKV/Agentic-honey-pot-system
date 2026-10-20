@@ -636,23 +636,40 @@ class ProfilerService {
      * Match profiles to find similar scammers
      */
     async matchProfiles(targetProfileId, limit = 10) {
-        const targetProfile = await ScammerProfile.findOne({ profileId: targetProfileId });
+        if (typeof targetProfileId !== 'string' || !targetProfileId.trim() || targetProfileId.length > 256) {
+            return [];
+        }
+        const requestedLimit = Number.isFinite(Number(limit)) ? Math.trunc(Number(limit)) : 10;
+        const resultLimit = Math.max(1, Math.min(requestedLimit, 50));
+        const targetId = targetProfileId.trim();
+
+        const targetProfile = await ScammerProfile.findOne({ profileId: targetId })
+            .select('profileId psychologicalProfile.primaryTactic psychologicalProfile.sophistication behavioralFingerprint.pressureTactics behavioralFingerprint.languagePatterns')
+            .lean();
         if (!targetProfile) {
             return [];
         }
 
-        const allProfiles = await ScammerProfile.find({
-            profileId: { $ne: targetProfileId },
+        // Similarity is a bounded analyst aid, not a full-database attribution
+        // operation. Restrict the candidate scan and project only fields used by
+        // the scoring functions so profile growth cannot turn one request into an
+        // unbounded collection read.
+        const candidates = await ScammerProfile.find({
+            profileId: { $ne: targetId },
             status: 'active'
-        });
+        })
+            .select('profileId status riskScore lastSeen psychologicalProfile.primaryTactic psychologicalProfile.sophistication behavioralFingerprint.pressureTactics behavioralFingerprint.languagePatterns')
+            .sort({ riskScore: -1, lastSeen: -1 })
+            .limit(500)
+            .lean();
 
-        const matches = allProfiles.map(profile => ({
+        const matches = candidates.map(profile => ({
             profile,
             similarity: this._calculateSimilarity(targetProfile, profile)
         }))
             .filter(m => m.similarity > 0.3)
             .sort((a, b) => b.similarity - a.similarity)
-            .slice(0, limit);
+            .slice(0, resultLimit);
 
         return matches.map(m => ({
             profileId: m.profile.profileId,
@@ -667,42 +684,40 @@ class ProfilerService {
     _calculateSimilarity(profile1, profile2) {
         let score = 0;
         let factors = 0;
+        const psychology1 = profile1?.psychologicalProfile || {};
+        const psychology2 = profile2?.psychologicalProfile || {};
+        const behavior1 = profile1?.behavioralFingerprint || {};
+        const behavior2 = profile2?.behavioralFingerprint || {};
+        const tactics1 = Array.isArray(behavior1.pressureTactics) ? behavior1.pressureTactics : [];
+        const tactics2 = Array.isArray(behavior2.pressureTactics) ? behavior2.pressureTactics : [];
+        const patterns1 = Array.isArray(behavior1.languagePatterns) ? behavior1.languagePatterns : [];
+        const patterns2 = Array.isArray(behavior2.languagePatterns) ? behavior2.languagePatterns : [];
 
-        // Primary tactic
-        if (profile1.psychologicalProfile.primaryTactic === profile2.psychologicalProfile.primaryTactic) {
-            score += 0.3;
+        // Legacy documents may have incomplete nested fields; missing evidence
+        // should contribute no similarity rather than throwing during triage.
+        if (psychology1.primaryTactic && psychology2.primaryTactic) {
+            if (psychology1.primaryTactic === psychology2.primaryTactic) score += 0.3;
+            factors++;
         }
-        factors++;
 
-        // Sophistication
-        if (profile1.psychologicalProfile.sophistication === profile2.psychologicalProfile.sophistication) {
-            score += 0.2;
+        if (psychology1.sophistication && psychology2.sophistication) {
+            if (psychology1.sophistication === psychology2.sophistication) score += 0.2;
+            factors++;
         }
-        factors++;
 
-        // Shared pressure tactics
-        const sharedTactics = profile1.behavioralFingerprint.pressureTactics.filter(t =>
-            profile2.behavioralFingerprint.pressureTactics.includes(t)
-        );
-        score += (sharedTactics.length / Math.max(
-            profile1.behavioralFingerprint.pressureTactics.length,
-            profile2.behavioralFingerprint.pressureTactics.length,
-            1
-        )) * 0.3;
-        factors++;
+        if (tactics1.length || tactics2.length) {
+            const sharedTactics = tactics1.filter(t => tactics2.includes(t));
+            score += (sharedTactics.length / Math.max(tactics1.length, tactics2.length, 1)) * 0.3;
+            factors++;
+        }
 
-        // Shared language patterns
-        const sharedPatterns = profile1.behavioralFingerprint.languagePatterns.filter(p =>
-            profile2.behavioralFingerprint.languagePatterns.includes(p)
-        );
-        score += (sharedPatterns.length / Math.max(
-            profile1.behavioralFingerprint.languagePatterns.length,
-            profile2.behavioralFingerprint.languagePatterns.length,
-            1
-        )) * 0.2;
-        factors++;
+        if (patterns1.length || patterns2.length) {
+            const sharedPatterns = patterns1.filter(p => patterns2.includes(p));
+            score += (sharedPatterns.length / Math.max(patterns1.length, patterns2.length, 1)) * 0.2;
+            factors++;
+        }
 
-        return score / factors;
+        return factors ? score / factors : 0;
     }
 
     /**
@@ -710,14 +725,18 @@ class ProfilerService {
      */
     _identifySharedTraits(profile1, profile2) {
         const traits = [];
+        const psychology1 = profile1?.psychologicalProfile || {};
+        const psychology2 = profile2?.psychologicalProfile || {};
+        const behavior1 = profile1?.behavioralFingerprint || {};
+        const behavior2 = profile2?.behavioralFingerprint || {};
+        const tactics1 = Array.isArray(behavior1.pressureTactics) ? behavior1.pressureTactics : [];
+        const tactics2 = Array.isArray(behavior2.pressureTactics) ? behavior2.pressureTactics : [];
 
-        if (profile1.psychologicalProfile.primaryTactic === profile2.psychologicalProfile.primaryTactic) {
-            traits.push(`Same primary tactic: ${profile1.psychologicalProfile.primaryTactic}`);
+        if (psychology1.primaryTactic && psychology1.primaryTactic === psychology2.primaryTactic) {
+            traits.push(`Same primary tactic: ${psychology1.primaryTactic}`);
         }
 
-        const sharedTactics = profile1.behavioralFingerprint.pressureTactics.filter(t =>
-            profile2.behavioralFingerprint.pressureTactics.includes(t)
-        );
+        const sharedTactics = tactics1.filter(t => tactics2.includes(t));
         if (sharedTactics.length > 0) {
             traits.push(`Shared tactics: ${sharedTactics.join(', ')}`);
         }
