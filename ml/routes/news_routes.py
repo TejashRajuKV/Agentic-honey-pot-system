@@ -42,6 +42,10 @@ def fakenews_detect():
             ), 400
 
         text = data.get("text", "")
+        if not isinstance(text, str):
+            return jsonify(
+                format_error("fake_news", "Field 'text' must be a string")
+            ), 400
 
         # ── Validate input ──
         if is_empty(text):
