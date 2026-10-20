@@ -195,6 +195,31 @@ router.patch("/cases/:caseId", async (req, res) => {
     } catch { res.status(500).json({ status: "error", message: "Unable to update case" }); }
 });
 
+router.get("/cases/:caseId/report", async (req, res) => {
+    const caseId = boundedString(req.params.caseId, 100, { required: true });
+    if (!caseId || /[\\/\0-\x1f\x7f]/.test(caseId)) return res.status(400).json({ status: "error", message: "Invalid case ID" });
+    try {
+        const item = await InvestigationCase.findOne({ caseId }).lean();
+        if (!item) return res.status(404).json({ status: "error", message: "Case not found" });
+        const sessionIds = (item.sessionIds || []).slice(0, 10);
+        const [turns, audit] = await Promise.all([
+            ConversationTurn.find({ sessionId: { $in: sessionIds } }).sort({ timestamp: 1 }).limit(5000).select("sessionId turnIndex role text timestamp detectedScamIntent extractedIntel").lean(),
+            AuditLog.find({ sessionId: { $in: sessionIds } }).sort({ timestamp: 1 }).limit(5000).select("sessionId eventType timestamp detection intelligence notes safety").lean()
+        ]);
+        const timeline = [
+            ...turns.map((turn) => ({ source: "conversation", sessionId: turn.sessionId, timestamp: turn.timestamp, turnIndex: turn.turnIndex, role: turn.role, text: turn.text, detectedScamIntent: turn.detectedScamIntent, indicators: turn.extractedIntel || {} })),
+            ...audit.map((event) => ({ source: "audit", sessionId: event.sessionId, timestamp: event.timestamp, eventType: event.eventType, detection: event.detection || null, indicators: event.intelligence || null, notes: event.notes || "" }))
+        ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        res.json({ status: "success", data: {
+            reportId: `REPORT-${item.caseId}`, generatedAt: new Date().toISOString(),
+            case: { ...item, evidence: (item.evidence || []).map((entry) => ({ ...entry, integrity: entry.contentHash ? "sha256_hash_recorded" : "reference_only" })) },
+            evidenceTimeline: timeline,
+            indicatorReferences: item.indicators || [],
+            limitations: ["This report includes only records currently stored by the platform.", "A shared indicator or similarity score is not proof of attribution.", "This endpoint returns JSON evidence; it does not assert that external intelligence has been independently verified."]
+        } });
+    } catch { res.status(500).json({ status: "error", message: "Unable to generate case report" }); }
+});
+
 router.post("/cases/:caseId/notes", async (req, res) => {
     const text = boundedString(req.body?.text, 5000, { required: true });
     const author = req.body?.author === undefined ? "analyst" : boundedString(req.body.author, 120);
