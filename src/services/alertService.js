@@ -246,11 +246,20 @@ class AlertService {
      * Log alert to console/file
      */
     _logAlert(type, payload) {
+        // Logs are commonly shipped to shared observability systems. Keep them
+        // useful for triage without duplicating raw UPI IDs, phone numbers, URLs,
+        // or other extracted intelligence outside the access-controlled database.
         const timestamp = new Date().toISOString();
-        console.log(`[ALERT ${timestamp}] Type: ${type}`);
-        console.log(`  Session: ${payload.sessionId || 'N/A'}`);
-        console.log(`  Risk: ${payload.riskScore || 'N/A'}/100`);
-        console.log(`  Details:`, JSON.stringify(payload, null, 2));
+        const safeSummary = {
+            type,
+            sessionId: typeof payload.sessionId === 'string' ? payload.sessionId.slice(0, 200) : undefined,
+            profileId: typeof payload.profileId === 'string' ? payload.profileId.slice(0, 200) : undefined,
+            riskScore: Number.isFinite(payload.riskScore) ? payload.riskScore : undefined,
+            scamType: typeof payload.scamType === 'string' ? payload.scamType.slice(0, 80) : undefined,
+            indicatorCount: Array.isArray(payload.identifiers) ? payload.identifiers.length : undefined,
+            sharedIndicatorCount: Array.isArray(payload.sharedIdentifiers) ? payload.sharedIdentifiers.length : undefined
+        };
+        console.log(`[ALERT ${timestamp}]`, JSON.stringify(safeSummary));
     }
 
     /**
