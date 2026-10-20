@@ -109,6 +109,23 @@ class ProfilerService {
         // Bound stored session references while keeping the cumulative attempt counter.
         if (profile.sessions.length > 500) profile.sessions = profile.sessions.slice(-500);
 
+        // Normalize older/partially populated documents before risk calculations.
+        if (!profile.behavioralFingerprint || typeof profile.behavioralFingerprint !== 'object') {
+            profile.behavioralFingerprint = behavioral;
+        }
+        if (!profile.psychologicalProfile || typeof profile.psychologicalProfile !== 'object') {
+            profile.psychologicalProfile = psychological;
+        }
+        if (!Array.isArray(profile.behavioralFingerprint.pressureTactics)) {
+            profile.behavioralFingerprint.pressureTactics = [];
+        }
+        if (typeof profile.psychologicalProfile.primaryTactic !== 'string') {
+            profile.psychologicalProfile.primaryTactic = 'urgency';
+        }
+        if (typeof profile.psychologicalProfile.sophistication !== 'string') {
+            profile.psychologicalProfile.sophistication = 'low';
+        }
+
         // Calculate risk score from cumulative distinct-session metrics.
         profile.riskScore = this._calculateRiskScore(profile);
         profile.confidence = Math.min(profile.intelligence.totalVictimAttempts / 5, 1);
@@ -502,7 +519,7 @@ class ProfilerService {
             ) / 2)),
             persistenceScore: Math.max(
                 0,
-                Math.min(1, numberOr(previous.persistenceScore, 0), numberOr(incoming.persistenceScore, 0))
+                Math.min(1, Math.max(numberOr(previous.persistenceScore, 0), numberOr(incoming.persistenceScore, 0)))
             ),
             manipulationTechniques: [...new Set(techniques)].slice(0, 100)
         };
