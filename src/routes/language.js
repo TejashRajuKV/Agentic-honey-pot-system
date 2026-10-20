@@ -11,14 +11,14 @@ router.post('/detect', async (req, res) => {
     try {
         const { text } = req.body || {};
 
-        if (typeof text !== 'string' || !text.trim()) {
-            return res.status(400).json({ status: 'error', message: 'text (non-empty string) required' });
+        if (typeof text !== 'string' || !text.trim() || text.length > 20000) {
+            return res.status(400).json({ status: 'error', message: 'text must be a non-empty string of at most 20000 characters' });
         }
 
         const detection = languageService.detectLanguage(text);
         res.json({ status: 'success', data: detection });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process language request' });
     }
 });
 
@@ -61,6 +61,7 @@ router.post('/analyze-hinglish', async (req, res) => {
 router.get('/scam-phrases', async (req, res) => {
     try {
         const { language = 'english' } = req.query;
+        if (typeof language !== 'string' || language.length > 40 || !/^[a-zA-Z-]+$/.test(language)) return res.status(400).json({ status: 'error', message: 'Invalid language' });
         const phrases = languageService.getCommonScamPhrases(language);
         res.json({ status: 'success', data: phrases });
     } catch (error) {
