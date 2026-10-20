@@ -77,6 +77,7 @@ jobs:
           npm run test:simulation-service
           npm run test:privacy-service
           npm run test:behavioral-similarity
+          npm run test:adaptive-persona
           npm run test:readiness -- 1
 
       - name: Run end-to-end API integration tests
