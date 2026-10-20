@@ -41,14 +41,23 @@ export default function Integrations() {
                         {Object.entries(d.ml.modules || {}).map(([k, v]) => {
                             const composite = k === "multi_vector_analyzer";
                             const ruleBased = k === "loan_scorer";
+                            const fallbackAvailable = Boolean(d.ml.fallbacks?.[k]);
                             const label = composite
                                 ? "ROUTE AVAILABLE (COMPOSITE)"
                                 : ruleBased
                                     ? "AVAILABLE (RULE-BASED)"
-                                    : v ? "MODEL LOADED" : "MODEL MISSING";
+                                    : v
+                                        ? "MODEL LOADED"
+                                        : fallbackAvailable
+                                            ? "RULE-BASED FALLBACK (MODEL MISSING)"
+                                            : "MODEL MISSING";
                             const color = composite || ruleBased
                                 ? "var(--cyan)"
-                                : v ? "var(--green)" : "var(--red)";
+                                : v
+                                    ? "var(--green)"
+                                    : fallbackAvailable
+                                        ? "var(--amber)"
+                                        : "var(--red)";
                             return <Kv key={k} k={k.toUpperCase()} v={label} color={color} />;
                         })}
                     </Panel>
