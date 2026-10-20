@@ -110,52 +110,48 @@ async function updateScammerIntelligence(intelligence, sessionId, scamContext) {
  * Upsert scammer intelligence record
  */
 async function upsertScammerIntel(identifier, sessionId, confidence, riskLevel, categories) {
-    try {
-        const existing = await ScammerIntelligence.findOne(identifier);
+    const maxAttempts = 3;
+    const riskLevels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
-        if (existing) {
-            // Repeated messages from one conversation are not independent sightings.
-            // Count each session at most once, otherwise a single long chat can
-            // incorrectly satisfy cross-session auto-blacklisting thresholds.
-            existing.lastSeenAt = new Date();
-            if (!Array.isArray(existing.sessions)) existing.sessions = [];
-            const seenInThisSession = existing.sessions.includes(sessionId);
-            if (!seenInThisSession) {
-                const previousCount = Number.isFinite(existing.sessionCount) ? existing.sessionCount : existing.sessions.length;
-                existing.sessionCount = previousCount + 1;
-                existing.sessions.push(sessionId);
-                // Keep the most recent session references bounded; sessionCount remains
-                // the cumulative distinct-session counter.
-                if (existing.sessions.length > 500) existing.sessions = existing.sessions.slice(-500);
-                existing.averageConfidence =
-                    ((Number(existing.averageConfidence) || 0) * previousCount + confidence) /
-                    existing.sessionCount;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        try {
+            const existing = await ScammerIntelligence.findOne(identifier);
+
+            if (existing) {
+                // Optimistic concurrency (enabled on the schema) makes simultaneous
+                // read/modify/save operations conflict rather than silently overwrite.
+                existing.lastSeenAt = new Date();
+                if (!Array.isArray(existing.sessions)) existing.sessions = [];
+                const seenInThisSession = existing.sessions.includes(sessionId);
+                if (!seenInThisSession) {
+                    const previousCount = Number.isFinite(existing.sessionCount)
+                        ? existing.sessionCount
+                        : existing.sessions.length;
+                    existing.sessionCount = previousCount + 1;
+                    existing.sessions.push(sessionId);
+                    if (existing.sessions.length > 500) existing.sessions = existing.sessions.slice(-500);
+                    existing.averageConfidence =
+                        ((Number(existing.averageConfidence) || 0) * previousCount + confidence) /
+                        existing.sessionCount;
+                }
+
+                if (!Array.isArray(existing.scamTypes)) existing.scamTypes = [];
+                existing.scamTypes = [...new Set([
+                    ...existing.scamTypes.filter((value) => typeof value === 'string' && value.trim()),
+                    ...categories
+                ])].slice(-100);
+
+                if (riskLevels.indexOf(riskLevel) > riskLevels.indexOf(existing.riskLevel)) {
+                    existing.riskLevel = riskLevel;
+                }
+                if (existing.sessionCount >= 3 && existing.averageConfidence > 0.7) {
+                    existing.isBlacklisted = true;
+                }
+
+                await existing.save();
+                return;
             }
 
-            // Update scam types (add new ones)
-            if (!Array.isArray(existing.scamTypes)) existing.scamTypes = [];
-            existing.scamTypes = [...new Set([
-                ...existing.scamTypes.filter((value) => typeof value === 'string' && value.trim()),
-                ...categories
-            ])].slice(-100);
-
-            // Escalate risk level if needed
-            const riskLevels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-            if (riskLevels.indexOf(riskLevel) > riskLevels.indexOf(existing.riskLevel)) {
-                existing.riskLevel = riskLevel;
-            }
-
-            // Auto-blacklist only after distinct sessions, not repeated messages.
-            if (existing.sessionCount >= 3 && existing.averageConfidence > 0.7) {
-                existing.isBlacklisted = true;
-            }
-
-            await existing.save();
-
-            console.log(`🔄 Updated known scammer record (${identifier.upiId ? 'UPI' : 'phone'}; ${existing.sessionCount} sessions)`);
-
-        } else {
-            // Create new record
             const newRecord = new ScammerIntelligence({
                 ...identifier,
                 sessionCount: 1,
@@ -164,13 +160,18 @@ async function upsertScammerIntel(identifier, sessionId, confidence, riskLevel, 
                 averageConfidence: confidence,
                 riskLevel
             });
-
             await newRecord.save();
-
-            console.log(`🆕 New scammer tracked (${identifier.upiId ? 'UPI' : 'phone'} identifier)`);
+            return;
+        } catch (error) {
+            const retryable = error?.name === 'VersionError' || error?.code === 11000;
+            if (retryable && attempt < maxAttempts - 1) {
+                // Re-read after a concurrent writer wins. Duplicate-key retries
+                // also handle deployments that add a unique index after cleanup.
+                continue;
+            }
+            console.error('Scammer intelligence upsert failed');
+            return;
         }
-    } catch (error) {
-        console.error('Scammer intelligence upsert failed');
     }
 }
 
