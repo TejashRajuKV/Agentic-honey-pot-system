@@ -206,9 +206,30 @@ router.post("/risk", async (req, res) => {
                 return res.status(400).json({ status: "error", message: `Field '${field}' must contain at most 50 strings of 200 characters or fewer` });
             }
         }
-        if (body.behavior !== undefined && body.behavior !== null &&
-            (typeof body.behavior !== "object" || Array.isArray(body.behavior))) {
-            return res.status(400).json({ status: "error", message: "Field 'behavior' must be an object" });
+        if (body.behavior !== undefined && body.behavior !== null) {
+            if (typeof body.behavior !== "object" || Array.isArray(body.behavior)) {
+                return res.status(400).json({ status: "error", message: "Field 'behavior' must be an object" });
+            }
+            const behavior = body.behavior;
+            const required = ["hour", "amount", "transactions", "new_device", "failed_logins"];
+            const missing = required.filter((field) => behavior[field] === undefined);
+            if (missing.length) {
+                return res.status(400).json({ status: "error", message: `Behavior is missing fields: ${missing.join(", ")}` });
+            }
+            const integerFields = ["hour", "transactions", "new_device", "failed_logins"];
+            if (integerFields.some((field) => !Number.isInteger(behavior[field]))) {
+                return res.status(400).json({ status: "error", message: "Behavior hour, counters, and device flag must be integers" });
+            }
+            if (behavior.hour < 0 || behavior.hour > 23 ||
+                behavior.transactions < 0 || behavior.transactions > 1000000 ||
+                behavior.failed_logins < 0 || behavior.failed_logins > 1000000 ||
+                ![0, 1].includes(behavior.new_device)) {
+                return res.status(400).json({ status: "error", message: "Behavior counters or hour are outside supported ranges" });
+            }
+            if (typeof behavior.amount !== "number" || !Number.isFinite(behavior.amount) ||
+                behavior.amount < 0 || behavior.amount > 1e15) {
+                return res.status(400).json({ status: "error", message: "Behavior amount must be a finite number from 0 to 1e15" });
+            }
         }
 
         const result = await riskFusion.assess({
