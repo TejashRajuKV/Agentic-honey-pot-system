@@ -18,4 +18,8 @@ const turnSchema = new Schema({
     }
 });
 
+// Supports bounded recent-history and intelligence queries by session.
+turnSchema.index({ sessionId: 1, turnIndex: -1, _id: -1 });
+turnSchema.index({ sessionId: 1, timestamp: 1 });
+
 module.exports = mongoose.model("ConversationTurn", turnSchema);
