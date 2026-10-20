@@ -30,8 +30,6 @@ jobs:
       PORT: 3000
       MONGODB_URI: mongodb://127.0.0.1:27017/cyberrakshak_test
       API_KEY: ci-test-api-key-not-for-production-0123456789
-      CONSOLE_PASSWORD: ci-only-console-password
-      CONSOLE_SESSION_SECRET: ci-only-session-secret-long-enough-for-tests-0123456789
       ML_PORT: 5050
       PYTHONUNBUFFERED: "1"
       PIP_DISABLE_PIP_VERSION_CHECK: "1"
