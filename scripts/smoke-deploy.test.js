@@ -35,7 +35,7 @@ async function main() {
         const base = `http://127.0.0.1:${server.address().port}`;
         const result = await runSmoke(base);
         assert.equal(result.failed, 0, JSON.stringify(result.checks));
-        assert.equal(result.passed, 5);
+        assert.equal(result.passed, 6);
 
         const broken = await runSmoke(base, {
             fetchImpl: async (url, options) => {
