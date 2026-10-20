@@ -17,7 +17,17 @@ def init_nltk():
             print(f"Warning: NLTK download failed ({e}). Using existing data.")
 
 init_nltk()
-STOP_WORDS = set(stopwords.words("english"))
+try:
+    STOP_WORDS = set(stopwords.words("english"))
+except LookupError:
+    # Some deployments run without outbound access to download NLTK corpora.
+    # Keep preprocessing available with a small conservative fallback rather
+    # than crashing the entire Flask service during module import.
+    STOP_WORDS = {
+        "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+        "in", "is", "it", "of", "on", "or", "that", "the", "this", "to",
+        "was", "were", "with",
+    }
 
 # ─────────────────────────────────────────
 # Indian scam keywords to KEEP
