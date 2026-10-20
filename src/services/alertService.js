@@ -1,7 +1,7 @@
 // src/services/alertService.js
 const crypto = require('crypto');
 const AlertConfig = require('../models/AlertConfig');
-const { validateWebhookUrl } = require('../utils/webhookUrlPolicy');
+const { validateWebhookUrl, requestValidatedWebhook } = require('../utils/webhookUrlPolicy');
 // Uses Node's built-in fetch (node-fetch v3 is ESM-only and cannot be require()d)
 
 /**
@@ -173,7 +173,6 @@ class AlertService {
     async _sendWebhook(config, payload, retryCount = 0) {
         const started = Date.now();
         try {
-            await validateWebhookUrl(config.webhookUrl);
             const body = JSON.stringify(payload);
             const headers = {
                 'Content-Type': 'application/json',
@@ -195,13 +194,9 @@ class AlertService {
                 headers['X-CyberRakshak-Signature'] = `sha256=${signature}`;
             }
 
-            const response = await fetch(config.webhookUrl, {
-                method: 'POST',
-                headers,
-                body,
-                signal: AbortSignal.timeout(10000),
-                // Never follow redirects: a public endpoint must not redirect the server to a private address.
-                redirect: 'manual'
+            // The request helper pins the socket lookup to the validated public DNS answer.
+            const response = await requestValidatedWebhook(config.webhookUrl, {
+                method: 'POST', headers, body, timeoutMs: 10000
             });
 
             if (!response.ok) {
@@ -418,7 +413,6 @@ class AlertService {
         };
 
         try {
-            await validateWebhookUrl(webhookUrl);
             const headers = {
                 'Content-Type': 'application/json'
             };
@@ -437,12 +431,8 @@ class AlertService {
                 }
             }
 
-            const response = await fetch(webhookUrl, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(testPayload),
-                signal: AbortSignal.timeout(5000),
-                redirect: 'manual'
+            const response = await requestValidatedWebhook(webhookUrl, {
+                method: 'POST', headers, body: JSON.stringify(testPayload), timeoutMs: 5000
             });
 
             return {
