@@ -83,7 +83,12 @@ app.use(express.static('public'));
 const { createRateLimiter } = require("./middleware/rateLimit");
 const { consoleAuth } = require("./middleware/consoleAuth");
 const consoleRateLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 120 });
-const mlRateLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 30 });
+// Keep integration tests from tripping the production per-minute ceiling while
+// exercising many ML endpoints in one run. Production defaults remain conservative.
+const mlRateLimit = createRateLimiter({
+    windowMs: 60_000,
+    maxRequests: process.env.NODE_ENV === "test" ? 500 : 30,
+});
 const alertsRateLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 60 });
 
 // API Routes
