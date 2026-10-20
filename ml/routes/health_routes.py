@@ -30,6 +30,16 @@ def health_check():
             # Its availability is tied to the Flask health response itself.
             "multi_vector_analyzer": True,
         },
+        # These detectors retain deterministic rule-based paths when serialized
+        # artifacts are unavailable. Report that capability separately from model readiness.
+        "fallbacks": {
+            "scam_radar": True,
+            "behavior_monitor": True,
+            "fake_news": True,
+            "phishing_detector": True,
+            "loan_scorer": True,
+            "multi_vector_analyzer": True,
+        },
     }), 200
 
 
