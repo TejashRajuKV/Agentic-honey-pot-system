@@ -500,6 +500,16 @@ async function main() {
         ok(c.sessions >= 2 && c.linked && c.linkEvidence.length >= 1, "campaign not linked by shared identifier");
         ok(/not proof/i.test(c.caveat), "campaign must carry the attribution caveat");
     });
+    await check("STIX export validates session and download query parameters", async () => {
+        const badSession = await get("/console/stix?sessionId=a&sessionId=b");
+        const blankSession = await get("/console/stix?sessionId=%20%20");
+        const badDownload = await get("/console/stix?download=yes");
+        const validDownload = await get("/console/stix?download=true");
+        ok(badSession.status === 400, `repeated sessionId returned ${badSession.status}`);
+        ok(blankSession.status === 400, `blank sessionId returned ${blankSession.status}`);
+        ok(badDownload.status === 400, `invalid download flag returned ${badDownload.status}`);
+        ok(validDownload.status === 200 && /attachment/.test(validDownload.type), "download=true should return an attachment");
+    });
     await check("STIX 2.1 export: valid bundle with indicators, campaign and relationships", async () => {
         const res = await fetch(`${V1}/console/stix`);
         ok(res.status === 200 && (res.headers.get("content-type") || "").includes("stix"), `status ${res.status} type ${res.headers.get("content-type")}`);
