@@ -42,7 +42,33 @@ router.get('/config', async (req, res) => {
  */
 router.put('/config', async (req, res) => {
     try {
-        if (req.body?.webhookUrl) await validateWebhookUrl(req.body.webhookUrl);
+        const body = req.body;
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
+            return res.status(400).json({ status: 'error', message: 'Request body must be a JSON object' });
+        }
+        if (body.webhookUrl !== undefined && typeof body.webhookUrl !== 'string') {
+            return res.status(400).json({ status: 'error', message: 'webhookUrl must be a string' });
+        }
+        if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
+            return res.status(400).json({ status: 'error', message: 'enabled must be a boolean' });
+        }
+        const allowedChannels = ['webhook', 'email', 'log', 'database'];
+        if (body.channels !== undefined &&
+            (!Array.isArray(body.channels) || body.channels.some((channel) => !allowedChannels.includes(channel)))) {
+            return res.status(400).json({ status: 'error', message: 'channels must be an array containing only webhook, email, log, or database' });
+        }
+        for (const field of ['triggers', 'filters', 'auth', 'retryConfig']) {
+            if (body[field] !== undefined && (!body[field] || typeof body[field] !== 'object' || Array.isArray(body[field]))) {
+                return res.status(400).json({ status: 'error', message: `${field} must be an object` });
+            }
+        }
+        if (body.auth?.type !== undefined && !['none', 'bearer', 'api_key', 'basic', 'hmac'].includes(body.auth.type)) {
+            return res.status(400).json({ status: 'error', message: 'auth.type is not supported' });
+        }
+        if (body.auth?.token !== undefined && typeof body.auth.token !== 'string') {
+            return res.status(400).json({ status: 'error', message: 'auth.token must be a string' });
+        }
+        if (body.webhookUrl) await validateWebhookUrl(body.webhookUrl);
 
         // Only accept documented configuration fields; do not allow clients to overwrite history/stats.
         const allowedFields = ['webhookUrl', 'enabled', 'triggers', 'channels', 'filters', 'auth', 'retryConfig'];
