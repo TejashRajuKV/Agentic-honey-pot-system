@@ -4,6 +4,11 @@ const router = express.Router();
 const profilerService = require('../services/profilerService');
 const ScammerProfile = require('../models/ScammerProfile');
 
+function validIdentifier(value) {
+    return typeof value === 'string' && value.trim().length > 0 && value.length <= 200
+        && !/[\\/\\0-\\x1f\\x7f]/.test(value);
+}
+
 function boundedInteger(value, fallback, maximum) {
     if (value === undefined || value === null || value === '') return fallback;
     const parsed = Number(value);
@@ -44,7 +49,7 @@ router.get('/', async (req, res) => {
 
         res.json({ status: 'success', data: profiles, count: profiles.length });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process profile request' });
     }
 });
 
@@ -54,6 +59,7 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
     try {
+        if (!validIdentifier(req.params.id)) return res.status(400).json({ status: 'error', message: 'Invalid profile ID' });
         const profile = await ScammerProfile.findOne({ profileId: req.params.id });
 
         if (!profile) {
@@ -74,7 +80,7 @@ router.post('/analyze', async (req, res) => {
     try {
         const { sessionId } = req.body || {};
 
-        if (typeof sessionId !== 'string' || !sessionId) {
+        if (!validIdentifier(sessionId)) {
             return res.status(400).json({ status: 'error', message: 'sessionId (string) required' });
         }
 
@@ -96,8 +102,10 @@ router.post('/analyze', async (req, res) => {
  */
 router.get('/match/:id', async (req, res) => {
     try {
-        const { limit = 10 } = req.query;
-        const matches = await profilerService.matchProfiles(req.params.id, parseInt(limit));
+        if (!validIdentifier(req.params.id)) return res.status(400).json({ status: 'error', message: 'Invalid profile ID' });
+        const limit = boundedInteger(req.query.limit, 10, 100);
+        if (limit === null) return res.status(400).json({ status: 'error', message: 'limit must be a positive integer' });
+        const matches = await profilerService.matchProfiles(req.params.id, limit);
         res.json({ status: 'success', data: matches, count: matches.length });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
