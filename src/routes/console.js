@@ -292,8 +292,8 @@ router.get("/incidents", async (req, res) => {
             return res.status(400).json({ status: "error", message: "limit must be a positive integer" });
         }
         const status = req.query.status;
-        if (status !== undefined && !["open", "investigating", "resolved", "false_positive"].includes(status)) {
-            return res.status(400).json({ status: "error", message: "status must be open, investigating, resolved, or false_positive" });
+        if (status !== undefined && !["open", "resolved"].includes(status)) {
+            return res.status(400).json({ status: "error", message: "status must be open or resolved" });
         }
         const data = await incidents.listIncidents({ limit: Math.min(parsedLimit, 100), status });
         res.json({ status: "success", count: data.length, data });
