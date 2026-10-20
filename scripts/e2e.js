@@ -114,7 +114,11 @@ async function main() {
         const nonFinite = await post("/ml/behavior", { hour: 3, amount: "NaN", transactions: 12, new_device: 1, failed_logins: 5 });
         ok(nonFinite.status === 400, JSON.stringify(nonFinite.data));
         const invalidDevice = await post("/ml/behavior", { hour: 3, amount: 100, transactions: 1, new_device: 7, failed_logins: 0 });
+        const fractionalHour = await post("/ml/behavior", { hour: 3.5, amount: 100, transactions: 1, new_device: 1, failed_logins: 0 });
+        const stringCount = await post("/ml/behavior", { hour: 3, amount: 100, transactions: "1", new_device: 1, failed_logins: 0 });
         ok(invalidDevice.status === 400, JSON.stringify(invalidDevice.data));
+        ok(fractionalHour.status === 400, JSON.stringify(fractionalHour.data));
+        ok(stringCount.status === 400, JSON.stringify(stringCount.data));
     });
     await check("loan rules + loan scorer", async () => {
         const rules = await get("/ml/loan/rules");
