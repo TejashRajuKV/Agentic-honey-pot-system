@@ -42,7 +42,7 @@ router.get('/report/:sessionId', async (req, res) => {
         const report = await qualityService.generateQualityReport(req.params.sessionId);
         res.json({ status: 'success', data: report });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to retrieve quality data' });
     }
 });
 
@@ -93,7 +93,7 @@ router.get('/metrics', async (req, res) => {
             }
         });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to retrieve quality data' });
     }
 });
 
@@ -107,7 +107,7 @@ router.get('/repetition/:sessionId', async (req, res) => {
         const repetition = await qualityService.detectRepetition(req.params.sessionId);
         res.json({ status: 'success', data: repetition });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to retrieve quality data' });
     }
 });
 
