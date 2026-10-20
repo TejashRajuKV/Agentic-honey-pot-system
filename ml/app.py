@@ -66,7 +66,9 @@ def index():
             "POST /api/behavior",
             "POST /api/phishing",
             "POST /api/loan",
-            "GET  /api/loan/rules"
+            "GET  /api/loan/rules",
+            "GET  /api/loan/check-app?name=<app_name>",
+            "POST /api/threat"
         ]
     }), 200
 
