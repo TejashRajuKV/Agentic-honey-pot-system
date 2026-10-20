@@ -434,6 +434,8 @@ class AlertService {
                     headers['Authorization'] = `Bearer ${authConfig.token}`;
                 } else if (authConfig.type === 'api_key') {
                     headers[authConfig.headerName || 'X-API-Key'] = authConfig.token;
+                } else if (authConfig.type === 'basic') {
+                    headers['Authorization'] = `Basic ${Buffer.from(authConfig.token || '').toString('base64')}`;
                 } else if (authConfig.type === 'hmac' && authConfig.token) {
                     const timestamp = Math.floor(Date.now() / 1000).toString();
                     headers['X-CyberRakshak-Timestamp'] = timestamp;
