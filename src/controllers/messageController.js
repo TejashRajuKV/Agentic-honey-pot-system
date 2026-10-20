@@ -418,12 +418,24 @@ const handleIncomingMessageUnlocked = async (req, res) => {
                             }
                         );
 
-                        // Mark callback as sent
-                        await updateSession(sessionId, {
-                            finalCallbackSent: true
-                        });
+                        // Only mark delivery complete after a confirmed 2xx response.
+                        // A failed attempt must remain retryable on a later turn; previously
+                        // the flag was set even when the callback request failed permanently.
+                        await updateSession(sessionId, callbackResult.success
+                            ? {
+                                finalCallbackSent: true,
+                                finalCallbackStatus: "sent",
+                                finalCallbackSentAt: new Date()
+                            }
+                            : {
+                                finalCallbackSent: false,
+                                finalCallbackStatus: "failed",
+                                finalCallbackAttemptAt: new Date()
+                            });
 
-                        // Log the intelligence report
+                        // Log the intelligence report only after the callback attempt; the
+                        // formatter is retained for local diagnostics and never sent to logs
+                        // as part of the callback response.
                         console.log(formatIntelligenceReport(sessionId, allIntel));
                     }
                 }
