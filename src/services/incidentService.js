@@ -19,6 +19,15 @@ const newId = () => `INC-${Date.now().toString(36).toUpperCase()}${Math.floor(Ma
  * @returns {Promise<{incident:object, alerts:Array<{type:string,payload:object}>}>}
  */
 async function registerEvent({ sessionId, triggers, intelligence = {}, riskScore = 0, scamType }, retryOnConflict = true) {
+    if (typeof sessionId !== 'string' || !sessionId.trim() || sessionId.length > 200) {
+        throw new TypeError('sessionId must be a non-empty string of at most 200 characters');
+    }
+    if (!Array.isArray(triggers) || triggers.some((trigger) => !trigger || typeof trigger.type !== 'string' || !trigger.type.trim())) {
+        throw new TypeError('triggers must be an array of typed alert objects');
+    }
+    if (!intelligence || typeof intelligence !== 'object' || Array.isArray(intelligence)) {
+        throw new TypeError('intelligence must be an object');
+    }
     const upi = intelligence.upiIds?.[0];
     const phone = intelligence.phoneNumbers?.[0];
     const key = (upi && `upi:${upi.toLowerCase()}`) || (phone && `phone:${String(phone).replace(/\D/g, '').slice(-10)}`) || `session:${sessionId}`;
@@ -32,6 +41,7 @@ async function registerEvent({ sessionId, triggers, intelligence = {}, riskScore
             title: `${(scamType || 'Scam').replace(/_/g, ' ').toLowerCase()} — ${upi ? 'UPI-linked activity' : phone ? 'phone-linked activity' : 'session activity'}`,
         });
     }
+    if (!Array.isArray(incident.sessionIds)) incident.sessionIds = [];
     const joinedNewSession = !incident.sessionIds.includes(sessionId);
     if (joinedNewSession) {
         incident.sessionIds.push(sessionId);
