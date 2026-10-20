@@ -68,7 +68,7 @@ router.get('/:id', async (req, res) => {
 
         res.json({ status: 'success', data: profile });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process profile request' });
     }
 });
 
@@ -92,7 +92,7 @@ router.post('/analyze', async (req, res) => {
 
         res.json({ status: 'success', data: profile });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process profile request' });
     }
 });
 
@@ -108,7 +108,7 @@ router.get('/match/:id', async (req, res) => {
         const matches = await profilerService.matchProfiles(req.params.id, limit);
         res.json({ status: 'success', data: matches, count: matches.length });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process profile request' });
     }
 });
 
