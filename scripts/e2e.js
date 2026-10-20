@@ -290,6 +290,16 @@ async function main() {
         ok(zeroLimit.status === 400, `zero limit returned ${zeroLimit.status}`);
         ok(capped.status === 200, `oversized limit should be safely capped, got ${capped.status}`);
     });
+    await check("profile listing validates filters and caps page size", async () => {
+        const badLimit = await get("/profiles?limit=abc");
+        const badStatus = await get("/profiles?status=under_review");
+        const badRisk = await get("/profiles?minRisk=101");
+        const capped = await get("/profiles?limit=100000");
+        ok(badLimit.status === 400, `invalid profile limit returned ${badLimit.status}`);
+        ok(badStatus.status === 400, `unsupported profile status returned ${badStatus.status}`);
+        ok(badRisk.status === 400, `out-of-range minRisk returned ${badRisk.status}`);
+        ok(capped.status === 200, `oversized profile limit should be capped, got ${capped.status}`);
+    });
     await check("active threat feed + profiles filter", async () => {
         const t = await get("/intelligence/threats?limit=50&status=active");
         ok(t.status === 200 && t.data.data.some((p) => p.identifiers?.upiIds?.includes(UPI)), "not in threat feed");
