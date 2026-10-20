@@ -258,7 +258,12 @@ router.get("/sessions/:id/killchain", async (req, res) => {
 /** GET /api/v1/console/campaigns — sessions grouped by shared infrastructure (potentially linked) */
 router.get("/campaigns", async (req, res) => {
     try {
-        const minSessions = Math.max(1, parseInt(req.query.minSessions || "1", 10) || 1);
+        const rawMinSessions = req.query.minSessions;
+        const parsedMinSessions = rawMinSessions === undefined ? 1 : Number(rawMinSessions);
+        if (!Number.isInteger(parsedMinSessions) || parsedMinSessions < 1) {
+            return res.status(400).json({ status: "error", message: "minSessions must be a positive integer" });
+        }
+        const minSessions = Math.min(parsedMinSessions, 1000);
         const data = await campaigns.detectCampaigns({ minSessions });
         res.json({ status: "success", count: data.length, data });
     } catch (error) {
