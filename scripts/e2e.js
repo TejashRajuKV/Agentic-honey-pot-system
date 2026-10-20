@@ -104,9 +104,30 @@ async function main() {
         const r = await post("/ml/loan", { instant_approval: true, no_rbi_registration: true });
         ok(r.status === 200, `loan ${r.status}: ${JSON.stringify(r.data).slice(0, 200)}`);
     });
+    await check("loan app reference matching does not falsely verify partial names", async () => {
+        const falseMatch = await get("/ml/loan/check-app?name=fake%20SBI%20loan%20app");
+        ok(falseMatch.status === 200 && falseMatch.data.db_status === "UNVERIFIED", JSON.stringify(falseMatch.data));
+        const exactMatch = await get("/ml/loan/check-app?name=PhonePe");
+        ok(exactMatch.status === 200 && exactMatch.data.db_status === "RBI_VERIFIED" && exactMatch.data.is_safe === null,
+            "exact brand match must be a reference hint, not a safety guarantee");
+    });
+    await check("known app name cannot suppress observed loan risk factors", async () => {
+        const r = await post("/ml/loan", {
+            app_name: "PhonePe",
+            no_rbi_registration: true,
+            too_many_permissions: true,
+        });
+        ok(r.status === 200 && r.data.confidence >= 50, JSON.stringify(r.data));
+    });
     await check("threat analyzer (multi-vector fusion)", async () => {
         const r = await post("/ml/threat", { message: "Share your OTP now", url: "http://secure-login-bank-india.com/update", app: "" });
         ok(r.status === 200 && r.data.overall_confidence != null, JSON.stringify(r.data).slice(0, 200));
+        ok(r.data.module_summary?.scam_radar && r.data.module_summary?.url_risk,
+            "multi-vector response must expose separate message and URL scores");
+        const messageOnly = await post("/ml/threat", { message: "Share your OTP now", url: "", app: "" });
+        ok(messageOnly.status === 200, "message-only threat analysis failed");
+        ok(r.data.module_summary.scam_radar.confidence === messageOnly.data.module_summary.scam_radar.confidence,
+            "adding a URL must not overwrite the message scam score");
     });
     await check("non-whitelisted ML path is refused", async () => {
         const r = await get("/ml/../../etc/passwd");
