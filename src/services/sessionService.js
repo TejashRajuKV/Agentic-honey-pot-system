@@ -74,6 +74,21 @@ async function getConversationHistory(sessionId) {
  * @returns {Object} - Saved conversation turn
  */
 async function saveConversationTurn(sessionId, role, text, intel = {}, scamIntent = false) {
+    if (typeof sessionId !== "string" || !sessionId.trim() || sessionId.length > 200) {
+        throw new TypeError("Invalid session identifier");
+    }
+    if (role !== "user" && role !== "agent") {
+        throw new TypeError("Invalid conversation role");
+    }
+    if (typeof text !== "string" || text.length > 20000) {
+        throw new TypeError("Invalid conversation text");
+    }
+    const cleanIntelValues = (values) => Array.isArray(values)
+        ? [...new Set(values
+            .filter((value) => typeof value === "string" && value.trim())
+            .map((value) => value.trim().slice(0, 2048)))].slice(0, 100)
+        : [];
+
     // Initialize legacy sessions from their existing turn count exactly once. The
     // conditional update makes concurrent first writers converge on one sequence.
     const session = await Session.findOne({ sessionId }).select("turnSequence").lean();
@@ -106,11 +121,11 @@ async function saveConversationTurn(sessionId, role, text, intel = {}, scamInten
         text,
         detectedScamIntent: scamIntent,
         extractedIntel: {
-            upiIds: Array.isArray(intel.upiIds) ? intel.upiIds : [],
-            phoneNumbers: Array.isArray(intel.phoneNumbers) ? intel.phoneNumbers : [],
-            urls: Array.isArray(intel.urls) ? intel.urls : [],
-            scamPhrases: Array.isArray(intel.scamPhrases) ? intel.scamPhrases : [],
-            behavioralPatterns: Array.isArray(intel.behavioralPatterns) ? intel.behavioralPatterns : []
+            upiIds: cleanIntelValues(intel.upiIds),
+            phoneNumbers: cleanIntelValues(intel.phoneNumbers),
+            urls: cleanIntelValues(intel.urls),
+            scamPhrases: cleanIntelValues(intel.scamPhrases),
+            behavioralPatterns: cleanIntelValues(intel.behavioralPatterns)
         }
     });
 
@@ -153,7 +168,16 @@ async function determineEngagementPhase(sessionId) {
  * @returns {Object} - Aggregated intelligence
  */
 async function getSessionIntelligence(sessionId) {
-    const turns = await ConversationTurn.find({ sessionId });
+    if (typeof sessionId !== "string" || !sessionId.trim() || sessionId.length > 200) {
+        return { upiIds: [], phoneNumbers: [], urls: [], scamPhrases: [], behavioralPatterns: [] };
+    }
+    // Keep repeated per-turn aggregation bounded for very long-lived sessions.
+    // Recent evidence is preferred; the saved turn records remain unchanged.
+    const turns = await ConversationTurn.find({ sessionId })
+        .select("turnIndex extractedIntel")
+        .sort({ turnIndex: -1, _id: -1 })
+        .limit(1000)
+        .lean();
 
     const aggregatedIntel = {
         upiIds: new Set(),
@@ -174,11 +198,11 @@ async function getSessionIntelligence(sessionId) {
     });
 
     return {
-        upiIds: Array.from(aggregatedIntel.upiIds),
-        phoneNumbers: Array.from(aggregatedIntel.phoneNumbers),
-        urls: Array.from(aggregatedIntel.urls),
-        scamPhrases: Array.from(aggregatedIntel.scamPhrases),
-        behavioralPatterns: Array.from(aggregatedIntel.behavioralPatterns)
+        upiIds: Array.from(aggregatedIntel.upiIds).slice(0, 500),
+        phoneNumbers: Array.from(aggregatedIntel.phoneNumbers).slice(0, 500),
+        urls: Array.from(aggregatedIntel.urls).slice(0, 500),
+        scamPhrases: Array.from(aggregatedIntel.scamPhrases).slice(0, 500),
+        behavioralPatterns: Array.from(aggregatedIntel.behavioralPatterns).slice(0, 500)
     };
 }
 
