@@ -102,6 +102,9 @@ def threat_analyze():
             "overall_label":      overall["overall_label"],
             "overall_color":      overall["overall_color"],
             "overall_emoji":      overall["overall_emoji"],
+            # Per-signal scores make the composite result auditable by callers.
+            "module_summary":     overall["module_summary"],
+            "highest_risk":       overall["highest_risk"],
             "threat_count":       len(threats),
             "threats":            threats,
             "safe":               len(threats) == 0
