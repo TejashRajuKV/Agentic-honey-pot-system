@@ -25,7 +25,8 @@
     "test:simulation-service": "node tests/simulation-service.js",
     "test:privacy-service": "node tests/privacy-service.js",
     "test:behavioral-similarity": "node tests/behavioral-similarity.js",
-    "test:adaptive-persona": "node tests/adaptive-persona.js"
+    "test:adaptive-persona": "node tests/adaptive-persona.js",
+    "test:indicator-reputation": "node tests/indicator-reputation.js"
   },
   "keywords": [
     "honeypot",
