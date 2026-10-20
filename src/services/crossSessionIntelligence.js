@@ -91,22 +91,31 @@ async function upsertScammerIntel(identifier, sessionId, confidence, riskLevel, 
         const existing = await ScammerIntelligence.findOne(identifier);
 
         if (existing) {
-            // Update existing record
+            // Repeated messages from one conversation are not independent sightings.
+            // Count each session at most once, otherwise a single long chat can
+            // incorrectly satisfy cross-session auto-blacklisting thresholds.
             existing.lastSeenAt = new Date();
-            existing.sessionCount += 1;
-            existing.sessions.push(sessionId);
+            if (!Array.isArray(existing.sessions)) existing.sessions = [];
+            const seenInThisSession = existing.sessions.includes(sessionId);
+            if (!seenInThisSession) {
+                const previousCount = Number.isFinite(existing.sessionCount) ? existing.sessionCount : existing.sessions.length;
+                existing.sessionCount = previousCount + 1;
+                existing.sessions.push(sessionId);
+                // Keep the most recent session references bounded; sessionCount remains
+                // the cumulative distinct-session counter.
+                if (existing.sessions.length > 500) existing.sessions = existing.sessions.slice(-500);
+                existing.averageConfidence =
+                    ((Number(existing.averageConfidence) || 0) * previousCount + confidence) /
+                    existing.sessionCount;
+            }
 
             // Update scam types (add new ones)
+            if (!Array.isArray(existing.scamTypes)) existing.scamTypes = [];
             categories.forEach(cat => {
-                if (!existing.scamTypes.includes(cat)) {
+                if (typeof cat === 'string' && !existing.scamTypes.includes(cat)) {
                     existing.scamTypes.push(cat);
                 }
             });
-
-            // Update average confidence
-            existing.averageConfidence =
-                (existing.averageConfidence * (existing.sessionCount - 1) + confidence) /
-                existing.sessionCount;
 
             // Escalate risk level if needed
             const riskLevels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -114,14 +123,14 @@ async function upsertScammerIntel(identifier, sessionId, confidence, riskLevel, 
                 existing.riskLevel = riskLevel;
             }
 
-            // Auto-blacklist if seen 3+ times with high confidence
+            // Auto-blacklist only after distinct sessions, not repeated messages.
             if (existing.sessionCount >= 3 && existing.averageConfidence > 0.7) {
                 existing.isBlacklisted = true;
             }
 
             await existing.save();
 
-            console.log(`🔄 Updated known scammer: ${JSON.stringify(identifier)} (${existing.sessionCount} sessions)`);
+            console.log(`🔄 Updated known scammer record (${identifier.upiId ? 'UPI' : 'phone'}; ${existing.sessionCount} sessions)`);
 
         } else {
             // Create new record
@@ -136,7 +145,7 @@ async function upsertScammerIntel(identifier, sessionId, confidence, riskLevel, 
 
             await newRecord.save();
 
-            console.log(`🆕 New scammer tracked: ${JSON.stringify(identifier)}`);
+            console.log(`🆕 New scammer tracked (${identifier.upiId ? 'UPI' : 'phone'} identifier)`);
         }
     } catch (error) {
         console.error('Error upserting scammer intel:', error);
