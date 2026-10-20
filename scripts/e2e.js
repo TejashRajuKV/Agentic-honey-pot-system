@@ -157,6 +157,14 @@ async function main() {
         ok(messageOnly.status === 200, "message-only threat analysis failed");
         ok(r.data.module_summary.scam_radar.confidence === messageOnly.data.module_summary.scam_radar.confidence,
             "adding a URL must not overwrite the message scam score");
+
+        const malformed = await post("/ml/threat", { message: { text: "OTP" } });
+        ok(malformed.status === 400, `structured message should be rejected, got ${malformed.status}`);
+
+        const queryTld = await post("/ml/threat", { url: "https://example.com/redirect?next=.xyz" });
+        ok(queryTld.status === 200, `URL query-string case failed: ${queryTld.status}`);
+        ok(!queryTld.data.module_summary?.url_risk || queryTld.data.module_summary.url_risk.confidence < 40,
+            "TLD-like text in a URL path/query must not be treated as the hostname's TLD");
     });
     await check("non-whitelisted ML path is refused", async () => {
         const r = await get("/ml/../../etc/passwd");
