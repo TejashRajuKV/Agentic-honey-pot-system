@@ -18,7 +18,7 @@ const newId = () => `INC-${Date.now().toString(36).toUpperCase()}${Math.floor(Ma
  * @param {string} [ev.scamType]
  * @returns {Promise<{incident:object, alerts:Array<{type:string,payload:object}>}>}
  */
-async function registerEvent({ sessionId, triggers, intelligence = {}, riskScore = 0, scamType }) {
+async function registerEvent({ sessionId, triggers, intelligence = {}, riskScore = 0, scamType }, retryOnConflict = true) {
     const upi = intelligence.upiIds?.[0];
     const phone = intelligence.phoneNumbers?.[0];
     const key = (upi && `upi:${upi.toLowerCase()}`) || (phone && `phone:${String(phone).replace(/\D/g, '').slice(-10)}`) || `session:${sessionId}`;
@@ -76,7 +76,20 @@ async function registerEvent({ sessionId, triggers, intelligence = {}, riskScore
     }
     incident.alertsSent += alerts.length;
     incident.alertsSuppressed += Math.max(0, triggers.length - alerts.length);
-    await incident.save();
+    try {
+        await incident.save();
+    } catch (error) {
+        // Two workers can both observe a missing key and race to insert the first
+        // incident. The unique key index prevents duplicates; re-read the winner and
+        // apply this event once rather than failing the whole request.
+        if (retryOnConflict && error && error.code === 11000) {
+            return registerEvent(
+                { sessionId, triggers, intelligence, riskScore, scamType },
+                false
+            );
+        }
+        throw error;
+    }
     return { incident, alerts: alerts.map((a) => ({ ...a, payload: { ...a.payload, incidentId: incident.incidentId } })) };
 }
 
