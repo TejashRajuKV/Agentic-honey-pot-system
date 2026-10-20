@@ -196,7 +196,6 @@ router.post("/risk", async (req, res) => {
             }
         }
 
-        const identifiers = [];
         for (const field of ["upiIds", "phoneNumbers"]) {
             const value = body[field];
             if (value === undefined || value === null) continue;
@@ -206,7 +205,6 @@ router.post("/risk", async (req, res) => {
             if (value.length > 50 || value.some((item) => typeof item !== "string" || item.length > 200)) {
                 return res.status(400).json({ status: "error", message: `Field '${field}' must contain at most 50 strings of 200 characters or fewer` });
             }
-            identifiers.push(...value);
         }
         if (body.behavior !== undefined && body.behavior !== null &&
             (typeof body.behavior !== "object" || Array.isArray(body.behavior))) {
