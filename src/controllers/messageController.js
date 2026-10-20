@@ -12,7 +12,7 @@ const {
     getSessionIntelligence,
     updateSessionEmotion
 } = require("../services/sessionService");
-const { sendFinalCallback, formatIntelligenceReport } = require("../../agent/callbackService");
+const { sendFinalCallback } = require("../../agent/callbackService");
 const { sanitizeText, calculateDuration } = require("../utils/helpers");
 const { getMLScamConfidence } = require("../services/mlBridgeService");
 
@@ -433,10 +433,17 @@ const handleIncomingMessageUnlocked = async (req, res) => {
                                 finalCallbackAttemptAt: new Date()
                             });
 
-                        // Log the intelligence report only after the callback attempt; the
-                        // formatter is retained for local diagnostics and never sent to logs
-                        // as part of the callback response.
-                        console.log(formatIntelligenceReport(sessionId, allIntel));
+                        // Log aggregate counts only. The formatted report contains raw
+                        // UPI IDs, phone numbers, URLs, and scam phrases that should not be
+                        // written to general application logs.
+                        console.log("Final intelligence callback attempted", {
+                            sessionId,
+                            callbackStatus: callbackResult.success ? "sent" : "failed",
+                            upiIdCount: Array.isArray(allIntel.upiIds) ? allIntel.upiIds.length : 0,
+                            phoneNumberCount: Array.isArray(allIntel.phoneNumbers) ? allIntel.phoneNumbers.length : 0,
+                            urlCount: Array.isArray(allIntel.urls) ? allIntel.urls.length : 0,
+                            scamPhraseCount: Array.isArray(allIntel.scamPhrases) ? allIntel.scamPhrases.length : 0
+                        });
                     }
                 }
             }
