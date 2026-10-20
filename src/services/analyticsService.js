@@ -23,7 +23,9 @@ class AnalyticsService {
         // Get all sessions for this day
         const sessions = await Session.find({
             createdAt: { $gte: startOfDay, $lte: endOfDay }
-        });
+        })
+            .select('sessionId createdAt scamEverDetected maxScamProbability highestPhase scamType')
+            .lean();
 
         // Calculate core metrics
         const totalSessions = sessions.length;
@@ -56,7 +58,9 @@ class AnalyticsService {
         const scammerTurns = await ConversationTurn.find({
             timestamp: { $gte: startOfDay, $lte: endOfDay },
             role: 'user'
-        });
+        })
+            .select('sessionId text extractedIntel timestamp')
+            .lean();
         const textBySession = new Map();
         for (const t of scammerTurns) {
             textBySession.set(t.sessionId, `${textBySession.get(t.sessionId) || ''} ${t.text}`);
@@ -98,7 +102,9 @@ class AnalyticsService {
         // Get quality metrics
         const qualityMetrics = await QualityMetrics.find({
             timestamp: { $gte: startOfDay, $lte: endOfDay }
-        });
+        })
+            .select('scores.overall')
+            .lean();
 
         let qualityScores = { avg: 0, min: 1, max: 0 };
         if (qualityMetrics.length > 0) {
@@ -160,7 +166,10 @@ class AnalyticsService {
     async getPatternTrends(startDate, endDate) {
         const analytics = await Analytics.find({
             date: { $gte: startDate, $lte: endDate }
-        }).sort({ date: 1 });
+        })
+            .select('date patternTrends')
+            .sort({ date: 1 })
+            .lean();
 
         // Compile trends across multiple days
         const trendMap = new Map();
@@ -204,7 +213,9 @@ class AnalyticsService {
         const sessions = await Session.find({
             createdAt: { $gte: startDate },
             scamEverDetected: true
-        });
+        })
+            .select('createdAt')
+            .lean();
 
         // Create 7x24 heatmap (day of week x hour of day)
         const heatmap = Array(7).fill(0).map(() => Array(24).fill(0));
@@ -234,7 +245,8 @@ class AnalyticsService {
         const scammers = await ScammerProfile.find({ status: 'active' })
             .sort({ 'intelligence.totalVictimAttempts': -1, riskScore: -1 })
             .limit(limit)
-            .select('profileId identifiers psychologicalProfile riskScore intelligence lastSeen');
+            .select('profileId identifiers psychologicalProfile riskScore intelligence lastSeen')
+            .lean();
 
         return scammers;
     }
@@ -248,7 +260,9 @@ class AnalyticsService {
 
         const analytics = await Analytics.find({
             date: { $gte: startDate }
-        });
+        })
+            .select('date metrics.languageBreakdown')
+            .lean();
 
         const totals = {
             english: 0,
@@ -285,7 +299,12 @@ class AnalyticsService {
     async exportAnalytics(startDate, endDate, format = 'json') {
         const analytics = await Analytics.find({
             date: { $gte: startDate, $lte: endDate }
-        }).sort({ date: 1 });
+        })
+            .select(format === 'csv'
+                ? 'date metrics.totalSessions metrics.scamsDetected metrics.averageConfidence metrics.qualityScores.avg threatSummary.newScammers threatSummary.knownScammers'
+                : undefined)
+            .sort({ date: 1 })
+            .lean();
 
         if (format === 'json') {
             return analytics;
@@ -333,7 +352,10 @@ class AnalyticsService {
         // 7-day trends
         const weeklyAnalytics = await Analytics.find({
             date: { $gte: last7Days }
-        }).sort({ date: 1 });
+        })
+            .select('date metrics.totalSessions metrics.scamsDetected metrics.averageConfidence')
+            .sort({ date: 1 })
+            .lean();
 
         const weeklyAvg = {
             sessions: weeklyAnalytics.reduce((sum, a) => sum + a.metrics.totalSessions, 0) / 7,
