@@ -4,21 +4,43 @@ const router = express.Router();
 const profilerService = require('../services/profilerService');
 const ScammerProfile = require('../models/ScammerProfile');
 
+function boundedInteger(value, fallback, maximum) {
+    if (value === undefined || value === null || value === '') return fallback;
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1) return null;
+    return Math.min(parsed, maximum);
+}
+
 /**
  * @route GET /api/v1/profiles
  * @desc Get all scammer profiles
  */
 router.get('/', async (req, res) => {
     try {
-        const { limit = 50, status, minRisk } = req.query;
+        const limit = boundedInteger(req.query.limit, 50, 100);
+        if (limit === null) {
+            return res.status(400).json({ status: 'error', message: 'limit must be a positive integer' });
+        }
 
+        const { status, minRisk } = req.query;
         const query = {};
-        if (status) query.status = status;
-        if (minRisk) query.riskScore = { $gte: parseInt(minRisk) };
+        if (status !== undefined) {
+            if (!['active', 'dormant', 'blacklisted'].includes(status)) {
+                return res.status(400).json({ status: 'error', message: 'Unsupported profile status' });
+            }
+            query.status = status;
+        }
+        if (minRisk !== undefined && minRisk !== '') {
+            const risk = Number(minRisk);
+            if (!Number.isFinite(risk) || risk < 0 || risk > 100) {
+                return res.status(400).json({ status: 'error', message: 'minRisk must be between 0 and 100' });
+            }
+            query.riskScore = { $gte: risk };
+        }
 
         const profiles = await ScammerProfile.find(query)
             .sort({ riskScore: -1, lastSeen: -1 })
-            .limit(parseInt(limit));
+            .limit(limit);
 
         res.json({ status: 'success', data: profiles, count: profiles.length });
     } catch (error) {
