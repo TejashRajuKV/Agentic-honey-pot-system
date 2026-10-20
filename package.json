@@ -23,7 +23,8 @@
     "test:investigation-analysis": "node tests/investigation-analysis.js",
     "test:rule-lab": "node tests/rule-lab.js",
     "test:simulation-service": "node tests/simulation-service.js",
-    "test:privacy-service": "node tests/privacy-service.js"
+    "test:privacy-service": "node tests/privacy-service.js",
+    "test:behavioral-similarity": "node tests/behavioral-similarity.js"
   },
   "keywords": [
     "honeypot",
