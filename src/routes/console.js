@@ -38,8 +38,12 @@ router.post("/messages", (req, res, next) => {
  * The HIBP key lives on the server (HIBP_API_KEY); without it we say so instead of inventing results.
  */
 router.post("/breach-check", async (req, res) => {
-    const email = String(req.body?.email || "").trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const rawEmail = req.body?.email;
+    if (typeof rawEmail !== "string" || rawEmail.length > 320) {
+        return res.status(400).json({ status: "error", message: "A valid email address is required" });
+    }
+    const email = rawEmail.trim();
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({ status: "error", message: "A valid email address is required" });
     }
     const key = process.env.HIBP_API_KEY;
@@ -60,6 +64,9 @@ router.post("/breach-check", async (req, res) => {
             return res.status(502).json({ status: "error", message: `HIBP responded with ${upstream.status}` });
         }
         const list = await upstream.json();
+        if (!Array.isArray(list)) {
+            return res.status(502).json({ status: "error", message: "Breach lookup returned an invalid response" });
+        }
         res.json({
             status: "success",
             data: {
@@ -74,7 +81,8 @@ router.post("/breach-check", async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(502).json({ status: "error", message: `Breach lookup failed: ${error.message}` });
+        // Avoid exposing upstream, network, or request details to callers.
+        res.status(502).json({ status: "error", message: "Breach lookup failed; please try again later" });
     }
 });
 
