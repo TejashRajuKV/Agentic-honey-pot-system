@@ -110,6 +110,12 @@ async function main() {
         const r = await post("/ml/behavior", { hour: 3, amount: 95000, transactions: 12, new_device: 1, failed_logins: 5 });
         ok(r.status === 200 && typeof r.data.confidence === "number", JSON.stringify(r.data).slice(0, 200));
     });
+    await check("behavior monitor rejects non-finite and invalid telemetry", async () => {
+        const nonFinite = await post("/ml/behavior", { hour: 3, amount: "NaN", transactions: 12, new_device: 1, failed_logins: 5 });
+        ok(nonFinite.status === 400, JSON.stringify(nonFinite.data));
+        const invalidDevice = await post("/ml/behavior", { hour: 3, amount: 100, transactions: 1, new_device: 7, failed_logins: 0 });
+        ok(invalidDevice.status === 400, JSON.stringify(invalidDevice.data));
+    });
     await check("loan rules + loan scorer", async () => {
         const rules = await get("/ml/loan/rules");
         ok(rules.status === 200, `rules ${rules.status}`);
