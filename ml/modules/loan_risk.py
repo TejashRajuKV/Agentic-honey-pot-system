@@ -55,7 +55,7 @@ MAX_SCORE = sum(rule["score"] for rule in SCORING_RULES.values())
 # MAX_SCORE = 175
 
 # ─────────────────────────────────────────
-# RBI Verified Safe Apps
+# Local brand/reference entries — not a live RBI verification service
 # ─────────────────────────────────────────
 RBI_SAFE_APPS = [
     {"name": "phonepe",          "display": "PhonePe",           "type": "UPI Payment"},
@@ -143,7 +143,7 @@ def check_app_database(app_name: str) -> dict:
             return {
                 "app_name":      app["display"],
                 "db_status":     "RBI_VERIFIED",
-                "is_safe":       True,
+                "is_safe":       None,
                 "message":       f"{app['display']} is listed in the platform's built-in reference list; independently verify the lender's current RBI status",
                 "app_type":      app["type"],
                 "danger_reason": None
