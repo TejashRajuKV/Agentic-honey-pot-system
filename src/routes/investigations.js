@@ -472,6 +472,60 @@ router.post("/playbooks/execute", async (req, res) => {
     }
 });
 
+router.post("/copilot/investigate", async (req, res) => {
+    const sessionId = boundedString(req.body?.sessionId, 200, { required: true });
+    if (!sessionId || /[\\/\0-\x1f\x7f]/.test(sessionId)) return res.status(400).json({ status: "error", message: "Valid sessionId is required" });
+    try {
+        const Session = require("../models/Session");
+        const [session, turns, audit] = await Promise.all([
+            Session.findOne({ sessionId }).select("sessionId scamEverDetected maxScamProbability scamType highestPhase engagementPhase createdAt lastActiveAt status").lean(),
+            ConversationTurn.find({ sessionId }).sort({ timestamp: 1 }).limit(1000).select("turnIndex role text timestamp detectedScamIntent extractedIntel").lean(),
+            AuditLog.find({ sessionId }).sort({ timestamp: 1 }).limit(1000).select("eventType timestamp detection intelligence notes safety").lean()
+        ]);
+        if (!session) return res.status(404).json({ status: "error", message: "Session not found" });
+        const identifiers = { upiIds: new Set(), phoneNumbers: new Set(), urls: new Set(), scamPhrases: new Set() };
+        for (const turn of turns) {
+            const intel = turn.extractedIntel || {};
+            for (const key of Object.keys(identifiers)) (intel[key] || []).forEach((value) => identifiers[key].add(value));
+        }
+        for (const event of audit) {
+            const intel = event.intelligence || {};
+            for (const key of Object.keys(identifiers)) (intel[key] || []).forEach((value) => identifiers[key].add(value));
+        }
+        const riskEvents = audit.filter((event) => event.eventType === "SCAM_DETECTED" || event.detection?.isScam);
+        const findings = [];
+        if (session.scamEverDetected) findings.push({
+            type: "detection_recorded", severity: session.maxScamProbability >= 0.85 ? "HIGH" : "MEDIUM",
+            statement: "The session record indicates scam activity was detected.",
+            evidence: [{ source: "session", reference: session.sessionId, field: "scamEverDetected" }],
+            confidence: Math.max(0, Math.min(1, Number(session.maxScamProbability) || 0))
+        });
+        for (const [kind, values] of Object.entries(identifiers)) {
+            if (values.size) findings.push({
+                type: "indicator_extracted", severity: "INFO",
+                statement: `${values.size} distinct ${kind} value(s) were extracted from stored session evidence.`,
+                evidence: turns.filter((turn) => (turn.extractedIntel?.[kind] || []).length).slice(0, 10).map((turn) => ({ source: "conversation_turn", reference: String(turn._id), timestamp: turn.timestamp, turnIndex: turn.turnIndex })),
+                confidence: null
+            });
+        }
+        if (riskEvents.length > 1) findings.push({
+            type: "repeated_detection_events", severity: "MEDIUM",
+            statement: `${riskEvents.length} stored audit events indicate repeated scam detections or risk signals.`,
+            evidence: riskEvents.slice(0, 20).map((event) => ({ source: "audit_event", reference: String(event._id), timestamp: event.timestamp, eventType: event.eventType })),
+            confidence: null
+        });
+        const allEvidenceCount = turns.length + audit.length;
+        res.json({ status: "success", data: {
+            session: { sessionId: session.sessionId, status: session.status, scamDetected: Boolean(session.scamEverDetected), riskScore: Number(session.maxScamProbability) || 0, scamType: session.scamType || "UNCLASSIFIED", phase: session.highestPhase || session.engagementPhase || "unknown", createdAt: session.createdAt, lastActiveAt: session.lastActiveAt },
+            summary: `Stored records contain ${turns.length} conversation turns and ${audit.length} audit events. ${findings.length} evidence-backed findings were derived from those records.`,
+            findings,
+            indicators: Object.fromEntries(Object.entries(identifiers).map(([key, values]) => [key, [...values].slice(0, 200)])),
+            evidenceInventory: { conversationTurns: turns.length, auditEvents: audit.length, totalRecords: allEvidenceCount, truncated: turns.length === 1000 || audit.length === 1000 },
+            limitations: ["This copilot uses stored application evidence and deterministic summaries; it does not prove attribution or infer a real-world identity.", "A missing indicator in the stored records does not establish that the indicator was absent from the original activity."]
+        } });
+    } catch { res.status(500).json({ status: "error", message: "Unable to investigate session evidence" }); }
+});
+
 router.get("/operations/overview", async (_req, res) => {
     try {
         const Session = require("../models/Session");
