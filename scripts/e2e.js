@@ -491,7 +491,7 @@ async function main() {
         const typo = (await post("/ml/phishing", { url: "https://paytrn.com/pay" })).data;
         ok(typo.signals.some((s) => s.signal === "brand_impersonation"), "rn/m typosquat not flagged");
         const good = (await post("/ml/phishing", { url: "https://www.onlinesbi.sbi/" })).data;
-        ok(good.confidence < 30, `official SBI domain scored ${good.confidence}`);
+        ok(typeof good.confidence === "number" && good.confidence < 30, `official SBI domain response: ${JSON.stringify(good)}`);
         const http = (await post("/ml/phishing", { url: "http://example.org/page" })).data;
         const https = (await post("/ml/phishing", { url: "https://example.org/page" })).data;
         ok(Math.abs(http.confidence - https.confidence) <= 5, `HTTPS changed the score by ${Math.abs(http.confidence - https.confidence)}`);
@@ -563,6 +563,7 @@ async function main() {
     await check("webhook HMAC signature verifies at the receiver, latency is measured", async () => {
         const http = require("http");
         const crypto = require("crypto");
+        const alertService = require("../src/services/alertService");
         const secret = `secret-${RUN}`;
         const got = await new Promise((resolve, reject) => {
             const srv = http.createServer((req, res) => {
@@ -571,8 +572,18 @@ async function main() {
                 req.on("end", () => { res.end("ok"); srv.close(); resolve({ headers: req.headers, body }); });
             }).listen(0, "127.0.0.1", async () => {
                 const url = `http://127.0.0.1:${srv.address().port}/hook`;
-                const t = await post("/alerts/test", { webhookUrl: url, auth: { type: "hmac", token: secret } });
-                if (t.status !== 200) reject(new Error(`test endpoint ${t.status}`));
+                // Exercise the real HMAC signing path while injecting only the transport:
+                // production SSRF protections correctly reject loopback webhook destinations.
+                const result = await alertService.testWebhook(url, { type: "hmac", token: secret }, async (target, options) => {
+                    const response = await fetch(target, {
+                        method: options.method,
+                        headers: options.headers,
+                        body: options.body,
+                        signal: AbortSignal.timeout(options.timeoutMs || 5000),
+                    });
+                    return { ok: response.ok, status: response.status, statusText: response.statusText };
+                });
+                if (!result.success) reject(new Error(`test webhook failed: ${result.message}`));
             });
             setTimeout(() => reject(new Error("receiver never got the webhook")), 8000);
         });
