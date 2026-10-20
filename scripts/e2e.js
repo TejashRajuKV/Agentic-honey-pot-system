@@ -94,6 +94,10 @@ async function main() {
         const r = await post("/ml/phishing", { url: "http://secure-login-bank-india.com/update" });
         ok(r.status === 200 && r.data.confidence >= 50, JSON.stringify(r.data).slice(0, 200));
     });
+    await check("phishing endpoint rejects non-string URLs", async () => {
+        const r = await post("/ml/phishing", { url: 12345 });
+        ok(r.status === 400 && r.data.label === "ERROR", JSON.stringify(r.data));
+    });
     await check("behavior monitor", async () => {
         const r = await post("/ml/behavior", { hour: 3, amount: 95000, transactions: 12, new_device: 1, failed_logins: 5 });
         ok(r.status === 200 && typeof r.data.confidence === "number", JSON.stringify(r.data).slice(0, 200));
