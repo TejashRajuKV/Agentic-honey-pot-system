@@ -187,11 +187,14 @@ The dashboard's **INVESTIGATION & RESPONSE** module provides an investigation ce
 | `POST /cases/:caseId/notes`, `POST /cases/:caseId/evidence` | Record analyst notes and evidence references; optional evidence content is hashed, not stored |
 | `GET /sessions/:sessionId/timeline` | Merge conversation turns and audit events chronologically |
 | `POST /copilot/investigate` | Produce deterministic findings linked to stored session evidence; this is not identity attribution or a free-form LLM conclusion |
+| `GET /sessions/:sessionId/similarities` | Compare bounded cross-session lexical fingerprints; overlap is not proof of common authorship |
+| `GET /quality/drift` | Summarize reviewed feedback, monthly quality signals and false-positive rates over the last 90 days |
 | `POST /url-analysis` | Static URL triage only; never fetches, resolves or opens the submitted URL |
 | `GET /indicators`, `POST /indicators/observe` | Track indicator reputation, sources, observations and expiry |
 | `POST /feedback`, `GET /feedback/summary` | Record analyst labels for detection quality review |
 | `GET /rules`, `POST /rules`, `PATCH /rules/:ruleId/status`, `POST /rules/replay` | Manage versioned deterministic rules and replay them on sample messages |
 | `GET /simulation/scenarios`, `POST /simulation/run` | Run bounded offline synthetic scenarios against enabled rules |
+| `GET /cases/:caseId/report` | Generate a JSON case report with linked timeline and evidence references |
 | `GET /operations/overview` | Return operational counts and recent audit activity |
 | `GET /playbooks/catalog`, `POST /playbooks/execute` | List and run narrowly allowlisted internal actions after explicit approval |
 | `POST /privacy/redact`, `GET /privacy/retention`, `GET /privacy/retention/preview` | Preview PII redaction and estimate records older than a retention target |
