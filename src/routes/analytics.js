@@ -3,6 +3,28 @@ const express = require('express');
 const router = express.Router();
 const analyticsService = require('../services/analyticsService');
 
+function boundedInteger(value, fallback, maximum) {
+    if (value === undefined || value === null || value === '') return fallback;
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1) return null;
+    return Math.min(parsed, maximum);
+}
+
+function resolveDateRange({ startDate, endDate, days }, fallbackDays = 30) {
+    const span = boundedInteger(days, fallbackDays, 366);
+    if (span === null) return { error: 'days must be a positive integer' };
+    const start = startDate !== undefined ? new Date(startDate) : new Date(Date.now() - span * 86400000);
+    const end = endDate !== undefined ? new Date(endDate) : new Date();
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) {
+        return { error: 'startDate and endDate must be valid dates' };
+    }
+    if (start > end) return { error: 'startDate must not be after endDate' };
+    if (end.getTime() - start.getTime() > 366 * 86400000) {
+        return { error: 'Date range cannot exceed 366 days' };
+    }
+    return { start, end };
+}
+
 /**
  * @route GET /api/v1/analytics/dashboard
  * @desc Get dashboard overview with key metrics
@@ -22,12 +44,10 @@ router.get('/dashboard', async (req, res) => {
  */
 router.get('/trends', async (req, res) => {
     try {
-        const { startDate, endDate, days = 30 } = req.query;
+        const range = resolveDateRange(req.query, 30);
+        if (range.error) return res.status(400).json({ status: 'error', message: range.error });
 
-        const start = startDate ? new Date(startDate) : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-        const end = endDate ? new Date(endDate) : new Date();
-
-        const trends = await analyticsService.getPatternTrends(start, end);
+        const trends = await analyticsService.getPatternTrends(range.start, range.end);
         res.json({ status: 'success', data: trends });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
@@ -40,8 +60,9 @@ router.get('/trends', async (req, res) => {
  */
 router.get('/heatmap', async (req, res) => {
     try {
-        const { days = 30 } = req.query;
-        const heatmap = await analyticsService.getScamHeatmap(parseInt(days));
+        const days = boundedInteger(req.query.days, 30, 366);
+        if (days === null) return res.status(400).json({ status: 'error', message: 'days must be a positive integer' });
+        const heatmap = await analyticsService.getScamHeatmap(days);
         res.json({ status: 'success', data: heatmap });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
@@ -54,8 +75,9 @@ router.get('/heatmap', async (req, res) => {
  */
 router.get('/top-scammers', async (req, res) => {
     try {
-        const { limit = 10 } = req.query;
-        const scammers = await analyticsService.getTopScammers(parseInt(limit));
+        const limit = boundedInteger(req.query.limit, 10, 100);
+        if (limit === null) return res.status(400).json({ status: 'error', message: 'limit must be a positive integer' });
+        const scammers = await analyticsService.getTopScammers(limit);
         res.json({ status: 'success', data: scammers });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
@@ -68,8 +90,9 @@ router.get('/top-scammers', async (req, res) => {
  */
 router.get('/language-stats', async (req, res) => {
     try {
-        const { days = 30 } = req.query;
-        const stats = await analyticsService.getLanguageStats(parseInt(days));
+        const days = boundedInteger(req.query.days, 30, 366);
+        if (days === null) return res.status(400).json({ status: 'error', message: 'days must be a positive integer' });
+        const stats = await analyticsService.getLanguageStats(days);
         res.json({ status: 'success', data: stats });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
@@ -82,12 +105,14 @@ router.get('/language-stats', async (req, res) => {
  */
 router.get('/export', async (req, res) => {
     try {
-        const { startDate, endDate, format = 'json', days = 30 } = req.query;
+        const range = resolveDateRange(req.query, 30);
+        if (range.error) return res.status(400).json({ status: 'error', message: range.error });
+        const format = req.query.format ?? 'json';
+        if (!['json', 'csv'].includes(format)) {
+            return res.status(400).json({ status: 'error', message: 'format must be json or csv' });
+        }
 
-        const start = startDate ? new Date(startDate) : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-        const end = endDate ? new Date(endDate) : new Date();
-
-        const data = await analyticsService.exportAnalytics(start, end, format);
+        const data = await analyticsService.exportAnalytics(range.start, range.end, format);
 
         if (format === 'csv') {
             res.setHeader('Content-Type', 'text/csv');
@@ -107,8 +132,11 @@ router.get('/export', async (req, res) => {
  */
 router.post('/aggregate', async (req, res) => {
     try {
-        const { date } = req.body;
-        const targetDate = date ? new Date(date) : new Date();
+        const date = req.body?.date;
+        const targetDate = date === undefined ? new Date() : new Date(date);
+        if (!Number.isFinite(targetDate.getTime())) {
+            return res.status(400).json({ status: 'error', message: 'date must be a valid date' });
+        }
 
         const analytics = await analyticsService.aggregateDailyMetrics(targetDate);
         res.json({ status: 'success', data: analytics });
