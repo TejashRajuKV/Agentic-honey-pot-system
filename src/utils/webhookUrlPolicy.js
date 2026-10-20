@@ -1,6 +1,8 @@
 // src/utils/webhookUrlPolicy.js
 const dns = require("node:dns/promises");
 const net = require("node:net");
+const http = require("node:http");
+const https = require("node:https");
 
 const blockedRanges = new net.BlockList();
 [
@@ -106,4 +108,49 @@ async function validateWebhookUrl(value, options = {}) {
     return url;
 }
 
-module.exports = { isPublicAddress, isLocalHostname, validateWebhookUrl };
+/**
+ * Make a webhook request using the exact public IP that was validated.
+ * Pinning the lookup used by the socket closes the validate-then-resolve DNS rebinding gap.
+ */
+async function requestValidatedWebhook(value, { method = "POST", headers = {}, body = "", timeoutMs = 10000 } = {}) {
+    let resolvedAddresses = null;
+    const lookup = async (hostname) => {
+        resolvedAddresses = await dns.lookup(hostname, { all: true, verbatim: true });
+        return resolvedAddresses;
+    };
+    const url = await validateWebhookUrl(value, { lookup });
+    const hostname = url.hostname.replace(/^\[|\]$/g, "");
+    const literalFamily = net.isIP(hostname);
+    const selected = literalFamily
+        ? { address: hostname, family: literalFamily }
+        : resolvedAddresses?.[0];
+
+    if (!selected || !isPublicAddress(selected.address)) {
+        throw new Error("Webhook URL did not resolve to a validated public address");
+    }
+
+    const transport = url.protocol === "https:" ? https : http;
+    return new Promise((resolve, reject) => {
+        const req = transport.request(url, {
+            method,
+            headers,
+            timeout: timeoutMs,
+            lookup: (_requestedHostname, options, callback) => {
+                if (options?.all) callback(null, [{ address: selected.address, family: selected.family }]);
+                else callback(null, selected.address, selected.family);
+            },
+        }, (res) => {
+            res.resume();
+            resolve({
+                ok: res.statusCode >= 200 && res.statusCode < 300,
+                status: res.statusCode,
+                statusText: res.statusMessage || "",
+            });
+        });
+        req.setTimeout(timeoutMs, () => req.destroy(new Error("Webhook request timed out")));
+        req.on("error", reject);
+        req.end(body);
+    });
+}
+
+module.exports = { isPublicAddress, isLocalHostname, validateWebhookUrl, requestValidatedWebhook };
