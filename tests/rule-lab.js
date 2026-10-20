@@ -18,7 +18,7 @@ const result = replayRules(rules, [
     "Please do this URGENTLY",
     "Visit https://example.com",
     "Pay to abc123@bank",
-    "Normal greeting"
+    "  Dear Customer, verify"
 ]);
 assert.equal(result.sampleCount, 4);
 assert.equal(result.ruleCount, 4);
@@ -26,7 +26,7 @@ assert.equal(result.results[0].matches, 1);
 assert.equal(result.results[1].matches, 1);
 assert.equal(result.results[2].matches, 1);
 assert.equal(result.results[3].matches, 1);
-assert.equal(result.matchedSamples, 3);
+assert.equal(result.matchedSamples, 4);
 assert.throws(() => replayRules(rules, Array(501).fill("x")), /at most 500/);
 assert.throws(() => replayRules(rules, ["x".repeat(10001)]), /10000 characters/);
 console.log("Rule lab checks passed (15 assertions).");
