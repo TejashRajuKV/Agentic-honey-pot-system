@@ -50,43 +50,47 @@ async function sendFinalCallback(sessionId, intelligence, sessionData) {
     // Do not log the extracted identifiers or full report payload; it can contain PII.
 
     try {
-        const fetch = (await import('node-fetch')).default;
-
-        const response = await fetch(getCallbackTarget().url, {
+        // Use the shared DNS-pinned webhook client: callback URLs can be overridden
+        // by deployment configuration, so they must not become an SSRF primitive.
+        // It rejects private/reserved destinations, disallows redirects, and applies
+        // a bounded timeout without fetching or logging an arbitrary response body.
+        const { requestValidatedWebhook } = require('../src/utils/webhookUrlPolicy');
+        const target = getCallbackTarget();
+        const response = await requestValidatedWebhook(target.url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'User-Agent': 'Honeypot-Backend/1.0'
             },
             body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(15000) // applies to the request and response body
+            timeoutMs: 15000
         });
 
         if (!response.ok) {
-            throw new Error(`Callback failed with status ${response.status}`);
+            console.error('Callback endpoint returned a non-success status:', response.status);
+            return {
+                success: false,
+                error: 'Callback endpoint returned a non-success status'
+            };
         }
 
-        let responseData;
-        try {
-            responseData = await response.json();
-        } catch {
-            responseData = { status: 'acknowledged' };
-        }
-
-        console.log('✅ Successfully sent final result to GUVI');
-        console.log('📊 Response:', responseData);
+        // Do not consume or log arbitrary evaluator response content; it is not
+        // needed by the caller and could contain secrets or untrusted text.
+        console.log('Successfully delivered final callback to configured evaluator');
 
         return {
             success: true,
-            response: responseData
+            response: { status: response.status }
         };
 
     } catch (error) {
-        console.error('❌ Failed to send callback to GUVI:', error.message);
+        // Validation, DNS, socket, and timeout errors can contain internal details.
+        // Keep diagnostics low-risk and return a stable message to the pipeline.
+        console.error('Callback delivery failed:', error?.name || 'Error');
 
         return {
             success: false,
-            error: error.message
+            error: 'Callback delivery failed'
         };
     }
 }
