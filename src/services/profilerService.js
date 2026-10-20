@@ -480,13 +480,31 @@ class ProfilerService {
     /**
      * Merge psychological data
      */
-    _mergePsychological(existing, newData) {
+    _mergePsychological(existing = {}, newData = {}) {
+        const previous = existing && typeof existing === 'object' ? existing : {};
+        const incoming = newData && typeof newData === 'object' ? newData : {};
+        const numberOr = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+        const techniques = [
+            ...(Array.isArray(previous.manipulationTechniques) ? previous.manipulationTechniques : []),
+            ...(Array.isArray(incoming.manipulationTechniques) ? incoming.manipulationTechniques : [])
+        ].filter((value) => typeof value === 'string' && value.trim());
+
         return {
-            primaryTactic: existing.primaryTactic, // Keep first identified
-            sophistication: this._maxSophistication(existing.sophistication, newData.sophistication),
-            adaptability: (existing.adaptability + newData.adaptability) / 2,
-            persistenceScore: Math.max(existing.persistenceScore, newData.persistenceScore),
-            manipulationTechniques: [...new Set([...existing.manipulationTechniques, ...newData.manipulationTechniques])]
+            primaryTactic: typeof previous.primaryTactic === 'string'
+                ? previous.primaryTactic
+                : (incoming.primaryTactic || 'urgency'),
+            sophistication: this._maxSophistication(
+                previous.sophistication || 'low',
+                incoming.sophistication || 'low'
+            ),
+            adaptability: Math.max(0, Math.min(1, (
+                numberOr(previous.adaptability, 0.5) + numberOr(incoming.adaptability, 0.5)
+            ) / 2)),
+            persistenceScore: Math.max(
+                0,
+                Math.min(1, numberOr(previous.persistenceScore, 0), numberOr(incoming.persistenceScore, 0))
+            ),
+            manipulationTechniques: [...new Set(techniques)].slice(0, 100)
         };
     }
 
