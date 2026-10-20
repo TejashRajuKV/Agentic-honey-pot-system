@@ -17,7 +17,9 @@
     "test:threat-network": "node tests/threat-network-correlation.js",
     "test:webhook-policy": "node tests/webhook-url-policy.js",
     "test:rate-limit": "node tests/rate-limit.js",
-    "test:console-auth": "node tests/console-auth.js"
+    "test:console-auth": "node tests/console-auth.js",
+    "smoke:deploy": "node scripts/smoke-deploy.js",
+    "test:smoke-deploy": "node scripts/smoke-deploy.test.js"
   },
   "keywords": [
     "honeypot",
