@@ -143,34 +143,28 @@ class AlertService {
      * Check if rate limit allows sending
      */
     _checkRateLimit(config) {
-        if (!config.filters.rateLimit.enabled) {
-            return true;
-        }
+        const rateLimit = config?.filters?.rateLimit;
+        if (rateLimit?.enabled === false) return true;
 
+        const maxPerHour = Number.isInteger(rateLimit?.maxAlertsPerHour) && rateLimit.maxAlertsPerHour > 0
+            ? rateLimit.maxAlertsPerHour : 10;
+        const maxPerDay = Number.isInteger(rateLimit?.maxAlertsPerDay) && rateLimit.maxAlertsPerDay > 0
+            ? rateLimit.maxAlertsPerDay : 50;
+        const history = Array.isArray(config?.history) ? config.history : [];
         const now = Date.now();
         const hourAgo = now - (60 * 60 * 1000);
         const dayAgo = now - (24 * 60 * 60 * 1000);
 
-        // Clean old entries
-        const recentAlerts = config.history.filter(a =>
-            new Date(a.timestamp).getTime() > dayAgo
+        // Ignore invalid timestamps in legacy/corrupt history instead of crashing dispatch.
+        const recentAlerts = history.filter((alert) => {
+            const timestamp = new Date(alert?.timestamp).getTime();
+            return Number.isFinite(timestamp) && timestamp > dayAgo;
+        });
+        const lastHourAlerts = recentAlerts.filter((alert) =>
+            new Date(alert.timestamp).getTime() > hourAgo
         );
 
-        const lastHourAlerts = recentAlerts.filter(a =>
-            new Date(a.timestamp).getTime() > hourAgo
-        );
-
-        // Check hourly limit
-        if (lastHourAlerts.length >= config.filters.rateLimit.maxAlertsPerHour) {
-            return false;
-        }
-
-        // Check daily limit
-        if (recentAlerts.length >= config.filters.rateLimit.maxAlertsPerDay) {
-            return false;
-        }
-
-        return true;
+        return lastHourAlerts.length < maxPerHour && recentAlerts.length < maxPerDay;
     }
 
     /**
