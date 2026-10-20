@@ -145,6 +145,7 @@ Values are loaded from environment variables. See [`.env.example`](.env.example)
 | `JSON_BODY_LIMIT` | Express JSON request body limit; default `1mb` |
 | `HIBP_API_KEY` | Optional Have I Been Pwned breach-lookup key |
 | `DB_BUFFER_TIMEOUT_MS` | MongoDB buffering timeout in milliseconds |
+| `DATA_RETENTION_DAYS` | Retention preview target (30–3650 days; default 365); does not automatically delete records |
 
 The default CORS allowlist is `http://localhost:5173,http://localhost:3000`. Only add origins you control. CORS is not an authentication mechanism.
 
@@ -175,6 +176,36 @@ The exact routes and payloads are defined in the current route and controller fi
 | `/api/v1/analytics/*`, `/api/v1/intelligence/*`, `/api/v1/profiles/*`, `/api/v1/alerts/*`, `/api/v1/quality/*`, `/api/v1/reports/*`, `/api/v1/language/*` | Console data and configuration workflows | Requires console session when authentication is configured |
 
 For the message endpoint, send the configured key in the `x-api-key` header. The public health probes and `/api/v1/auth/*` session/login endpoints remain unauthenticated. Protected dashboard routes require a signed HTTP-only session when `CONSOLE_PASSWORD` and `CONSOLE_SESSION_SECRET` are configured. In local development, those routes remain accessible when credentials are absent; production intentionally returns `503 CONSOLE_AUTH_NOT_CONFIGURED` until valid credentials are set.
+
+## Investigation and response workspace
+
+The dashboard's **INVESTIGATION & RESPONSE** module provides an investigation center backed by authenticated routes under `/api/v1/investigations`.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /cases`, `POST /cases`, `GET /cases/:caseId`, `PATCH /cases/:caseId` | Create, list and update investigation cases |
+| `POST /cases/:caseId/notes`, `POST /cases/:caseId/evidence` | Record analyst notes and evidence references; optional evidence content is hashed, not stored |
+| `GET /sessions/:sessionId/timeline` | Merge conversation turns and audit events chronologically |
+| `POST /copilot/investigate` | Produce deterministic findings linked to stored session evidence; this is not identity attribution or a free-form LLM conclusion |
+| `POST /url-analysis` | Static URL triage only; never fetches, resolves or opens the submitted URL |
+| `GET /indicators`, `POST /indicators/observe` | Track indicator reputation, sources, observations and expiry |
+| `POST /feedback`, `GET /feedback/summary` | Record analyst labels for detection quality review |
+| `GET /rules`, `POST /rules`, `PATCH /rules/:ruleId/status`, `POST /rules/replay` | Manage versioned deterministic rules and replay them on sample messages |
+| `GET /simulation/scenarios`, `POST /simulation/run` | Run bounded offline synthetic scenarios against enabled rules |
+| `GET /operations/overview` | Return operational counts and recent audit activity |
+| `GET /playbooks/catalog`, `POST /playbooks/execute` | List and run narrowly allowlisted internal actions after explicit approval |
+| `POST /privacy/redact`, `GET /privacy/retention`, `GET /privacy/retention/preview` | Preview PII redaction and estimate records older than a retention target |
+
+All these routes require the analyst console session. Playbooks currently support only internal case creation and indicator recording; they do not block, contact, or retaliate against external systems. Rule replay and simulation do not change production detection. URL analysis is heuristic, not a verdict. Retention endpoints are preview-only and do not delete records. Do not treat indicator overlap, heuristic scores, or model output as proof of attribution.
+
+Run the focused checks with:
+
+```bash
+npm run test:investigation-analysis
+npm run test:rule-lab
+npm run test:simulation-service
+npm run test:privacy-service
+```
 
 ## Threat correlation: how to interpret links
 
