@@ -131,13 +131,30 @@ function stop() {
 }
 
 async function status() {
-    const reachable = await isReachable(1200);
+    // Use one deadline-bound request for both reachability and health details.
+    // A second unbounded fetch after the probe used to leave the status API hanging
+    // when the ML process accepted a connection but stalled while returning JSON.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
+    let reachable = false;
     let health = null;
-    if (reachable) {
-        try {
-            health = await (await fetch(`${ML_URL}/api/health`)).json();
-        } catch { /* leave null */ }
+    try {
+        const response = await fetch(`${ML_URL}/api/health`, { signal: controller.signal });
+        reachable = response.ok;
+        if (reachable) {
+            try {
+                health = await response.json();
+            } catch {
+                // Reachability can still be reported even if health JSON is malformed.
+                health = null;
+            }
+        }
+    } catch {
+        reachable = false;
+    } finally {
+        clearTimeout(timer);
     }
+
     return {
         reachable,
         managed,
