@@ -73,6 +73,37 @@ router.put('/config', async (req, res) => {
              !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(body.auth.headerName))) {
             return res.status(400).json({ status: 'error', message: 'auth.headerName must be a valid HTTP header name of at most 100 characters' });
         }
+
+        // Bound numeric controls to prevent accidental or hostile resource exhaustion.
+        const numericRules = [
+            ['filters.minRiskScore', body.filters?.minRiskScore, 0, 100],
+            ['filters.rateLimit.maxAlertsPerHour', body.filters?.rateLimit?.maxAlertsPerHour, 1, 10000],
+            ['filters.rateLimit.maxAlertsPerDay', body.filters?.rateLimit?.maxAlertsPerDay, 1, 100000],
+            ['retryConfig.maxRetries', body.retryConfig?.maxRetries, 0, 10],
+            ['retryConfig.retryDelay', body.retryConfig?.retryDelay, 100, 60000],
+        ];
+        for (const [field, value, min, max] of numericRules) {
+            if (value !== undefined && (!Number.isFinite(value) || !Number.isInteger(value) || value < min || value > max)) {
+                return res.status(400).json({ status: 'error', message: `${field} must be an integer between ${min} and ${max}` });
+            }
+        }
+        for (const [field, value] of [
+            ['filters.rateLimit.enabled', body.filters?.rateLimit?.enabled],
+            ['retryConfig.enabled', body.retryConfig?.enabled],
+        ]) {
+            if (value !== undefined && typeof value !== 'boolean') {
+                return res.status(400).json({ status: 'error', message: `${field} must be a boolean` });
+            }
+        }
+        for (const [field, value] of [
+            ['filters.platforms', body.filters?.platforms],
+            ['filters.scamTypes', body.filters?.scamTypes],
+        ]) {
+            if (value !== undefined && (!Array.isArray(value) || value.length > 100 ||
+                value.some((item) => typeof item !== 'string' || item.length > 100))) {
+                return res.status(400).json({ status: 'error', message: `${field} must be an array of at most 100 strings (each at most 100 characters)` });
+            }
+        }
         if (body.webhookUrl) await validateWebhookUrl(body.webhookUrl);
 
         // Only accept documented configuration fields; do not allow clients to overwrite history/stats.
