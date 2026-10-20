@@ -38,7 +38,19 @@ export default function Integrations() {
                         <Kv k="STATUS" v={d.ml.reachable ? "ONLINE" : "OFFLINE"} color={d.ml.reachable ? "var(--green)" : "var(--red)"} />
                         <Kv k="LATENCY" v={d.ml.latencyMs != null ? `${d.ml.latencyMs} ms` : null} />
                         <Kv k="SUPERVISED_BY_GATEWAY" v={d.ml.managed ? `YES (pid ${d.ml.pid ?? "—"}, ${d.ml.restarts} restarts)` : "NO — external engine"} />
-                        {Object.entries(d.ml.modules || {}).map(([k, v]) => <Kv key={k} k={k.toUpperCase()} v={v ? "LOADED" : "MISSING"} color={v ? "var(--green)" : "var(--red)"} />)}
+                        {Object.entries(d.ml.modules || {}).map(([k, v]) => {
+                            const composite = k === "multi_vector_analyzer";
+                            const ruleBased = k === "loan_scorer";
+                            const label = composite
+                                ? "ROUTE AVAILABLE (COMPOSITE)"
+                                : ruleBased
+                                    ? "AVAILABLE (RULE-BASED)"
+                                    : v ? "MODEL LOADED" : "MODEL MISSING";
+                            const color = composite || ruleBased
+                                ? "var(--cyan)"
+                                : v ? "var(--green)" : "var(--red)";
+                            return <Kv key={k} k={k.toUpperCase()} v={label} color={color} />;
+                        })}
                     </Panel>
                     <Panel title="DATABASE (MongoDB)">
                         <Kv k="STATUS" v={d.db.connected ? "CONNECTED" : "DOWN"} color={d.db.connected ? "var(--green)" : "var(--red)"} />
