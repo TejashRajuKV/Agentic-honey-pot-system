@@ -6,6 +6,7 @@ from modules.scam_detector import predict_scam
 from modules.fake_news_detector import check_news
 from modules.loan_risk import score_loan
 from risk_engine.aggregator import aggregate_scores
+from urllib.parse import urlparse
 
 threat_bp = Blueprint("threat", __name__)
 
@@ -34,9 +35,31 @@ def threat_analyze():
                 format_error("threat_analyzer", "No data provided")
             ), 400
 
+        if not isinstance(data, dict):
+            return jsonify(format_error("threat_analyzer", "Request body must be a JSON object")), 400
+
         message = data.get("message", "")
-        url     = data.get("url",     "")
-        app     = data.get("app",     "")
+        url = data.get("url", "")
+        app = data.get("app", "")
+
+        # Reject structured values instead of coercing them or failing deep in a model.
+        for field, value, limit in (
+            ("message", message, 20000),
+            ("url", url, 4096),
+            ("app", app, 300),
+        ):
+            if value is None:
+                value = ""
+            if not isinstance(value, str):
+                return jsonify(format_error("threat_analyzer", f"Field '{field}' must be a string")), 400
+            if len(value) > limit:
+                return jsonify(format_error("threat_analyzer", f"Field '{field}' exceeds {limit} characters")), 413
+            if field == "message":
+                message = value
+            elif field == "url":
+                url = value
+            else:
+                app = value
 
         # ── Validate at least one field ──
         if is_empty(message) and is_empty(url) and is_empty(app):
@@ -124,18 +147,29 @@ def _check_url(url: str) -> dict:
     score   = 0
     reasons = []
 
-    url_lower = url.lower()
+    url_lower = url.strip().lower()
+    # Inspect the actual hostname, not arbitrary path/query text. Otherwise a
+    # harmless URL such as https://example.com/?next=.xyz is falsely flagged.
+    candidate = url.strip()
+    if "://" not in candidate:
+        candidate = "http://" + candidate
+    try:
+        parsed = urlparse(candidate)
+        hostname = (parsed.hostname or "").lower().rstrip(".")
+    except ValueError:
+        parsed = urlparse("")
+        hostname = ""
 
     suspicious_tlds = [".xyz", ".tk", ".ml", ".ga", ".cf", ".gq"]
     shorteners      = ["bit.ly", "tinyurl", "t.co", "goo.gl", "ow.ly", "short.ly"]
     phishing_words  = ["login", "verify", "update", "secure", "account",
                        "banking", "kyc", "otp", "confirm", "free", "prize"]
 
-    if any(tld in url_lower for tld in suspicious_tlds):
+    if hostname and any(hostname.endswith(tld) for tld in suspicious_tlds):
         score += 40
         reasons.append("Suspicious domain extension detected")
 
-    if any(s in url_lower for s in shorteners):
+    if hostname and any(hostname == s or hostname.endswith("." + s) for s in shorteners):
         score += 30
         reasons.append("URL shortener detected — hides real destination")
 
@@ -143,11 +177,11 @@ def _check_url(url: str) -> dict:
         score += 20
         reasons.append("Phishing keywords in URL")
 
-    if not url_lower.startswith("https"):
+    if parsed.scheme.lower() != "https":
         score += 15
         reasons.append("Not using secure HTTPS connection")
 
-    if url_lower.count(".") > 3:
+    if hostname.count(".") > 3:
         score += 20
         reasons.append("Suspicious subdomain structure")
 
