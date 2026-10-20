@@ -4,6 +4,9 @@ const { Schema } = mongoose;
 
 const sessionSchema = new Schema({
     sessionId: { type: String, required: true, unique: true },
+    // Atomic allocator for distinct conversation turn indexes under concurrent requests.
+    // Intentionally has no default so existing sessions can be initialized from stored turns.
+    turnSequence: { type: Number },
     platform: String,
     sender: String,
     createdAt: { type: Date, default: Date.now },
