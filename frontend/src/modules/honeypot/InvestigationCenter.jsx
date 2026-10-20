@@ -26,6 +26,10 @@ export default function InvestigationCenter() {
   const [urlResult, setUrlResult] = useState(null);
   const [samples, setSamples] = useState("Urgent: verify your account immediately\nVisit https://example.com/verify\nPlease pay to sample123@bank\nNormal customer question");
   const [replay, setReplay] = useState(null);
+  const [ruleName, setRuleName] = useState("");
+  const [ruleType, setRuleType] = useState("phrase_any");
+  const [ruleTerms, setRuleTerms] = useState("urgent, immediately");
+  const [ruleSeverity, setRuleSeverity] = useState("HIGH");
   const [feedbackSession, setFeedbackSession] = useState("");
   const [feedbackLabel, setFeedbackLabel] = useState("uncertain");
   const [feedbackNote, setFeedbackNote] = useState("");
@@ -106,6 +110,17 @@ export default function InvestigationCenter() {
     setDriftResult(response.data?.data || null);
     setActive("quality drift");
   }, "Detection quality signals loaded.");
+
+  const createRule = (event) => {
+    event.preventDefault();
+    if (!ruleName.trim()) return setError("Rule name is required.");
+    const terms = ruleTerms.split(",").map((term) => term.trim()).filter(Boolean);
+    if (["contains", "phrase_any", "starts_with"].includes(ruleType) && !terms.length) return setError("This rule type requires at least one term.");
+    run(async () => {
+      await api.post(`${ROOT}/rules`, { name: ruleName.trim(), type: ruleType, terms, severity: ruleSeverity, description: "Created in the analyst rule lab." });
+      setRuleName(""); setRuleTerms("");
+    }, "Rule saved as a draft. Enable it after reviewing its behavior.");
+  };
 
   const runSimulation = () => run(async () => {
     const response = await api.post(`${ROOT}/simulation/run`, {});
@@ -244,7 +259,15 @@ export default function InvestigationCenter() {
           <div><button style={button} type="submit">Replay enabled rules</button></div>
         </form>
         {replay && <div style={card}><h3 style={{ marginTop: 0 }}>Replay results</h3><p>{replay.ruleCount} rules · {replay.sampleCount} samples · {replay.matchedSamples} samples matched at least one rule</p>{replay.results.map((result) => <div key={result.ruleId || result.name} style={{ borderTop: "1px solid #8883", padding: "10px 0" }}><strong>{result.name}</strong> — {result.matches} matches ({Math.round(result.matchRate * 100)}%)<div style={{ opacity: .7, fontSize: 12 }}>{result.type} · {result.severity}</div></div>)}</div>}
-        <div style={card}><h3 style={{ marginTop: 0 }}>Saved rules ({rules.length})</h3>{rules.map((rule) => <div key={rule.ruleId} style={{ display: "flex", justifyContent: "space-between", gap: 10, borderTop: "1px solid #8883", padding: "8px 0", flexWrap: "wrap" }}><span>{rule.name} <small style={{ opacity: .65 }}>v{rule.version}</small></span><span>{rule.status} · {rule.severity}</span></div>)}{!rules.length && <p style={{ opacity: .7 }}>No saved rules yet. Rules can be created through the authenticated API.</p>}</div>
+        <form onSubmit={createRule} style={{ ...card, display: "grid", gap: 10 }}>
+          <h3 style={{ margin: 0 }}>Create a detection rule</h3>
+          <input style={field} value={ruleName} onChange={(e) => setRuleName(e.target.value)} maxLength={120} placeholder="Rule name" required />
+          <select style={field} value={ruleType} onChange={(e) => setRuleType(e.target.value)}>{[["contains","Contains phrase"],["phrase_any","Any phrase"],["starts_with","Starts with"],["url_present","URL present"],["upi_present","UPI-like value present"],["phone_present","Phone-like value present"]].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>
+          {["contains","phrase_any","starts_with"].includes(ruleType) && <input style={field} value={ruleTerms} onChange={(e) => setRuleTerms(e.target.value)} maxLength={3000} placeholder="Comma-separated terms" />}
+          <select style={{ ...field, maxWidth: 220 }} value={ruleSeverity} onChange={(e) => setRuleSeverity(e.target.value)}>{["LOW","MEDIUM","HIGH","CRITICAL"].map((v) => <option key={v}>{v}</option>)}</select>
+          <div><button style={button} type="submit">Save draft rule</button></div>
+        </form>
+        <div style={card}><h3 style={{ marginTop: 0 }}>Saved rules ({rules.length})</h3>{rules.map((rule) => <div key={rule.ruleId} style={{ display: "flex", justifyContent: "space-between", gap: 10, borderTop: "1px solid #8883", padding: "8px 0", flexWrap: "wrap" }}><span>{rule.name} <small style={{ opacity: .65 }}>v{rule.version}</small></span><span style={{ display: "flex", gap: 6, alignItems: "center" }}>{rule.status} · {rule.severity}<button style={button} onClick={() => run(() => api.patch(`${ROOT}/rules/${encodeURIComponent(rule.ruleId)}/status`, { status: rule.status === "enabled" ? "disabled" : "enabled" }), `Rule ${rule.status === "enabled" ? "disabled" : "enabled"}.`)}>{rule.status === "enabled" ? "Disable" : "Enable"}</button></span></div>)}{!rules.length && <p style={{ opacity: .7 }}>No saved rules yet. Rules can be created through the authenticated API.</p>}</div>
       </div>}
 
       {active === "simulation" && <div style={{ display: "grid", gap: 14 }}>
