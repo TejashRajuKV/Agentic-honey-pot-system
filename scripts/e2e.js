@@ -202,6 +202,15 @@ async function main() {
         ok(capped.status === 200, `oversized analytics limit should be capped, got ${capped.status}`);
     });
 
+    await check("alert history pagination rejects invalid limits and caps large requests", async () => {
+        const invalid = await get("/alerts/history?limit=not-a-number");
+        const zero = await get("/alerts/history?limit=0");
+        const capped = await get("/alerts/history?limit=100000");
+        ok(invalid.status === 400, `invalid alert limit returned ${invalid.status}`);
+        ok(zero.status === 400, `zero alert limit returned ${zero.status}`);
+        ok(capped.status === 200, `large alert limit should be capped, got ${capped.status}`);
+    });
+
     console.log("\nHoneypot agent (browser path: /api/v1/console/*)");
     const soft = `${RUN}-soft`;
     const hard = `${RUN}-hard`;
