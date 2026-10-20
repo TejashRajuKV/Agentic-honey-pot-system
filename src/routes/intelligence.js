@@ -65,7 +65,7 @@ router.get('/profile/:id', async (req, res) => {
 
         res.json({ status: 'success', data: report });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process threat intelligence request' });
     }
 });
 
@@ -84,7 +84,7 @@ router.post('/correlate', async (req, res) => {
         const correlation = await threatIntel.correlateSessions(sessionId);
         res.json({ status: 'success', data: correlation });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process threat intelligence request' });
     }
 });
 
@@ -114,7 +114,7 @@ router.post('/check', async (req, res) => {
 
         res.json({ status: 'success', data: result });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process threat intelligence request' });
     }
 });
 
@@ -131,7 +131,7 @@ router.get('/network', async (req, res) => {
         const network = await threatIntel.getThreatNetwork(limit);
         res.json({ status: 'success', data: network });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process threat intelligence request' });
     }
 });
 
