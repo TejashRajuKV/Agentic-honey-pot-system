@@ -20,86 +20,95 @@ class ThreatIntelligenceService {
         sessionId = sessionId.trim();
         const session = await Session.findOne({ sessionId }).select('sessionId').lean();
         if (!session) {
-            return { related: [], confidence: 0 };
+            return { related: [], totalMatches: 0, confidence: 0 };
         }
 
-        // Get all conversation turns to extract intelligence
-        const turns = await ConversationTurn.find({ sessionId })
-            .select('role text timestamp')
+        // Extract evidence from the source session once, then scan the bounded
+        // recent-turn window once for all indicator families. Previously each
+        // family triggered a separate 5,000-turn database read and re-extraction.
+        const sourceTurns = await ConversationTurn.find({ sessionId, role: 'user' })
+            .select('text')
             .sort({ turnIndex: -1, _id: -1 })
             .limit(2000)
             .lean();
-
-        // Extract all identifiers from this session
-        const identifiers = {
-            upiIds: new Set(),
-            phoneNumbers: new Set(),
-            urls: new Set()
-        };
-
-        for (const turn of turns) {
-            if (turn.role === 'user') {
-                const intel = intelligenceExtractor.extractAll(turn.text);
-                intel.upiIds.forEach(id => identifiers.upiIds.add(id));
-                intel.phoneNumbers.forEach(num => identifiers.phoneNumbers.add(num));
-                intel.urls.forEach(url => identifiers.urls.add(url));
-            }
-        }
-
-        // Find other sessions with matching identifiers
-        const relatedSessions = [];
-
-        // Search by UPI IDs
-        if (identifiers.upiIds.size > 0) {
-            const upiMatches = await this._findSessionsByIdentifier(
-                'upiIds',
-                Array.from(identifiers.upiIds),
-                sessionId
-            );
-            relatedSessions.push(...upiMatches);
-        }
-
-        // Search by phone numbers
-        if (identifiers.phoneNumbers.size > 0) {
-            const phoneMatches = await this._findSessionsByIdentifier(
-                'phoneNumbers',
-                Array.from(identifiers.phoneNumbers),
-                sessionId
-            );
-            relatedSessions.push(...phoneMatches);
-        }
-
-        // URLs can connect campaigns even when phone numbers and UPI IDs differ.
-        if (identifiers.urls.size > 0) {
-            const urlMatches = await this._findSessionsByIdentifier(
-                'urls',
-                Array.from(identifiers.urls),
-                sessionId
-            );
-            relatedSessions.push(...urlMatches);
-        }
-
-        // Deduplicate by session and by identifier value so the same signal
-        // cannot inflate a session's score when it appears in multiple turns.
-        const uniqueSessions = new Map();
-        for (const match of relatedSessions) {
-            if (!match || typeof match.sessionId !== 'string') continue;
-            if (!uniqueSessions.has(match.sessionId)) {
-                uniqueSessions.set(match.sessionId, { ...match, matchedIdentifiers: [] });
-            }
-            const existing = uniqueSessions.get(match.sessionId);
-            const seen = new Set(existing.matchedIdentifiers.map((item) => `${item.type}:${item.value}`));
-            for (const item of Array.isArray(match.matchedIdentifiers) ? match.matchedIdentifiers : []) {
-                const key = `${item.type}:${item.value}`;
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    existing.matchedIdentifiers.push(item);
+        const identifiers = { upiIds: new Set(), phoneNumbers: new Set(), urls: new Set() };
+        for (const turn of sourceTurns) {
+            if (typeof turn.text !== 'string') continue;
+            const intel = intelligenceExtractor.extractAll(turn.text);
+            for (const type of Object.keys(identifiers)) {
+                const values = Array.isArray(intel?.[type]) ? intel[type] : [];
+                for (const value of values) {
+                    if (typeof value === 'string' && value.trim() && value.length <= 2048) {
+                        identifiers[type].add(value.trim());
+                    }
                 }
             }
-            existing.matchScore = existing.matchedIdentifiers.length * 50;
         }
 
-        const related = Array.from(uniqueSessions.values())
+        if (![...identifiers.upiIds, ...identifiers.phoneNumbers, ...identifiers.urls].length) {
+            return { sessionId, related: [], totalMatches: 0, confidence: 0 };
+        }
+
+        const allTurns = await ConversationTurn.find({
+            sessionId: { $ne: sessionId },
+            role: 'user'
+        })
+            .select('sessionId text timestamp')
+            .sort({ timestamp: -1, _id: -1 })
+            .limit(5000)
+            .lean();
+
+        // Keep one evidence set per candidate session. An identifier appearing
+        // repeatedly across turns contributes only once to the correlation score.
+        const matchesBySession = new Map();
+        for (const turn of allTurns) {
+            if (typeof turn.sessionId !== 'string' || !turn.sessionId ||
+                typeof turn.text !== 'string') continue;
+            const intel = intelligenceExtractor.extractAll(turn.text);
+            const matches = [];
+            for (const type of Object.keys(identifiers)) {
+                const sourceValues = identifiers[type];
+                if (!sourceValues.size) continue;
+                const extracted = Array.isArray(intel?.[type]) ? intel[type] : [];
+                for (const value of extracted) {
+                    if (typeof value === 'string' && sourceValues.has(value)) {
+                        matches.push({ type, value });
+                    }
+                }
+            }
+            if (!matches.length) continue;
+
+            if (!matchesBySession.has(turn.sessionId)) matchesBySession.set(turn.sessionId, new Map());
+            const evidence = matchesBySession.get(turn.sessionId);
+            for (const item of matches) evidence.set(`${item.type}:${item.value}`, item);
+        }
+
+        // Candidate ordering follows the recent-turn scan; cap IDs before the
+        // single batched session lookup to bound memory and database work.
+        const candidateIds = [...matchesBySession.keys()].slice(0, 200);
+        if (!candidateIds.length) {
+            return { sessionId, related: [], totalMatches: 0, confidence: 0 };
+        }
+        const sessions = await Session.find({ sessionId: { $in: candidateIds } })
+            .select('sessionId createdAt maxScamProbability highestPhase')
+            .lean();
+        const sessionById = new Map(sessions.map((item) => [item.sessionId, item]));
+
+        const related = candidateIds.map((candidateId) => {
+            const candidate = sessionById.get(candidateId);
+            if (!candidate) return null;
+            const matchedIdentifiers = [...matchesBySession.get(candidateId).values()];
+            return {
+                sessionId: candidateId,
+                matchScore: matchedIdentifiers.length * 50,
+                matchedIdentifiers,
+                session: {
+                    createdAt: candidate.createdAt,
+                    scamProbability: candidate.maxScamProbability,
+                    phase: candidate.highestPhase
+                }
+            };
+        }).filter(Boolean)
             .sort((a, b) => b.matchScore - a.matchScore)
             .slice(0, 100);
 
@@ -109,65 +118,6 @@ class ThreatIntelligenceService {
             totalMatches: related.length,
             confidence: related.length > 0 ? Math.min(related[0].matchScore / 100, 1) : 0
         };
-    }
-
-    /**
-     * Helper to find sessions by identifier type
-     */
-    async _findSessionsByIdentifier(identifierType, values, excludeSessionId) {
-        const safeValues = Array.isArray(values)
-            ? [...new Set(values.filter((value) => typeof value === 'string' && value.trim() && value.length <= 2048))].slice(0, 100)
-            : [];
-        if (!safeValues.length) return [];
-
-        // Correlation is intentionally bounded to recent user turns. Scanning every
-        // historical message and querying Session once per match made this endpoint
-        // grow linearly in database reads as the deployment accumulated evidence.
-        const allTurns = await ConversationTurn.find({
-            sessionId: { $ne: excludeSessionId },
-            role: 'user'
-        })
-            .select('sessionId text timestamp')
-            .sort({ timestamp: -1, _id: -1 })
-            .limit(5000)
-            .lean();
-
-        const matchesBySession = new Map();
-        for (const turn of allTurns) {
-            if (typeof turn.sessionId !== 'string' || !turn.sessionId || typeof turn.text !== 'string') continue;
-            const intel = intelligenceExtractor.extractAll(turn.text);
-            const extracted = Array.isArray(intel?.[identifierType]) ? intel[identifierType] : [];
-            const matchesFound = safeValues.filter((value) => extracted.includes(value));
-            if (!matchesFound.length) continue;
-
-            if (!matchesBySession.has(turn.sessionId)) matchesBySession.set(turn.sessionId, new Set());
-            const set = matchesBySession.get(turn.sessionId);
-            for (const value of matchesFound) set.add(value);
-        }
-
-        const candidateIds = [...matchesBySession.keys()].slice(0, 200);
-        if (!candidateIds.length) return [];
-        const sessions = await Session.find({ sessionId: { $in: candidateIds } })
-            .select('sessionId createdAt maxScamProbability highestPhase')
-            .lean();
-        const sessionById = new Map(sessions.map((session) => [session.sessionId, session]));
-
-        return candidateIds.map((candidateId) => {
-            const session = sessionById.get(candidateId);
-            if (!session) return null;
-            const matchedIdentifiers = [...matchesBySession.get(candidateId)]
-                .map((value) => ({ type: identifierType, value }));
-            return {
-                sessionId: candidateId,
-                matchScore: matchedIdentifiers.length * 50,
-                matchedIdentifiers,
-                session: {
-                    createdAt: session.createdAt,
-                    scamProbability: session.maxScamProbability,
-                    phase: session.highestPhase
-                }
-            };
-        }).filter(Boolean);
     }
 
     /**
