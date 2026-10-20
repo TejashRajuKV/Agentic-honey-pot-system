@@ -15,15 +15,23 @@ const ScammerIntelligence = require('../models/ScammerIntelligence');
  */
 async function checkKnownScammer(upiIds = [], phoneNumbers = []) {
     try {
-        // Search for any matching UPI ID or phone number
-        const query = {
-            $or: [
-                { upiId: { $in: upiIds } },
-                { phoneNumber: { $in: phoneNumbers } }
-            ]
-        };
+        const cleanValues = (values) => Array.isArray(values)
+            ? [...new Set(values
+                .filter((value) => typeof value === 'string' && value.trim() && value.length <= 256)
+                .map((value) => value.trim()))].slice(0, 50)
+            : [];
+        const cleanUpiIds = cleanValues(upiIds);
+        const cleanPhoneNumbers = cleanValues(phoneNumbers);
+        if (cleanUpiIds.length === 0 && cleanPhoneNumbers.length === 0) {
+            return { isKnown: false };
+        }
 
-        const knownScammer = await ScammerIntelligence.findOne(query)
+        // Only query identifier classes with actual candidate values. Avoid broad
+        // empty-$in clauses and keep lookup work bounded for untrusted input.
+        const clauses = [];
+        if (cleanUpiIds.length) clauses.push({ upiId: { $in: cleanUpiIds } });
+        if (cleanPhoneNumbers.length) clauses.push({ phoneNumber: { $in: cleanPhoneNumbers } });
+        const knownScammer = await ScammerIntelligence.findOne({ $or: clauses })
             .sort({ sessionCount: -1 }); // Get most frequent first
 
         if (knownScammer) {
@@ -126,11 +134,10 @@ async function upsertScammerIntel(identifier, sessionId, confidence, riskLevel, 
 
             // Update scam types (add new ones)
             if (!Array.isArray(existing.scamTypes)) existing.scamTypes = [];
-            categories.forEach(cat => {
-                if (typeof cat === 'string' && !existing.scamTypes.includes(cat)) {
-                    existing.scamTypes.push(cat);
-                }
-            });
+            existing.scamTypes = [...new Set([
+                ...existing.scamTypes.filter((value) => typeof value === 'string' && value.trim()),
+                ...categories
+            ])].slice(-100);
 
             // Escalate risk level if needed
             const riskLevels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
