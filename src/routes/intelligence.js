@@ -36,7 +36,7 @@ router.get('/threats', async (req, res) => {
         if (limit === null) {
             return res.status(400).json({ status: 'error', message: 'limit must be a positive integer' });
         }
-        if (!['active', 'blacklisted', 'inactive', 'under_review'].includes(status)) {
+        if (!['active', 'dormant', 'blacklisted'].includes(status)) {
             return res.status(400).json({ status: 'error', message: 'Unsupported threat status' });
         }
 
