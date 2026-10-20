@@ -202,6 +202,16 @@ async function main() {
         ok(capped.status === 200, `oversized analytics limit should be capped, got ${capped.status}`);
     });
 
+    await check("campaign query rejects invalid minimum session counts and caps excessive values", async () => {
+        const invalid = await get("/console/campaigns?minSessions=abc");
+        const fractional = await get("/console/campaigns?minSessions=1.5");
+        const zero = await get("/console/campaigns?minSessions=0");
+        const capped = await get("/console/campaigns?minSessions=999999999");
+        ok(invalid.status === 400, `invalid campaign filter returned ${invalid.status}`);
+        ok(fractional.status === 400, `fractional campaign filter returned ${fractional.status}`);
+        ok(zero.status === 400, `zero campaign filter returned ${zero.status}`);
+        ok(capped.status === 200, `excessive campaign filter should be capped, got ${capped.status}`);
+    });
     await check("alert history pagination rejects invalid limits and caps large requests", async () => {
         const invalid = await get("/alerts/history?limit=not-a-number");
         const zero = await get("/alerts/history?limit=0");
