@@ -15,6 +15,9 @@ async function main() {
         res.setHeader("Content-Type", "application/json");
         if (req.url === "/api/v1/health" && req.method === "GET") {
             res.end(JSON.stringify({ status: "ok", service: "agentic-honeypot", db: "connected" }));
+        } else if (req.url === "/" && req.method === "GET" && req.headers.accept === "text/html") {
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            res.end('<!doctype html><html><body><div id="root"></div></body></html>');
         } else if (req.url === "/" && req.method === "GET") {
             res.end(JSON.stringify({ status: "ok" }));
         } else if (req.url === "/api/v1/messages" && req.method === "GET") {
@@ -35,7 +38,7 @@ async function main() {
         const base = `http://127.0.0.1:${server.address().port}`;
         const result = await runSmoke(base);
         assert.equal(result.failed, 0, JSON.stringify(result.checks));
-        assert.equal(result.passed, 6);
+        assert.equal(result.passed, 7);
 
         const broken = await runSmoke(base, {
             fetchImpl: async (url, options) => {
@@ -53,7 +56,7 @@ async function main() {
     } finally {
         await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
     }
-    console.log("PASS deployment smoke-check tests (URL validation, five endpoint checks, database readiness)");
+    console.log("PASS deployment smoke-check tests (URL validation, six endpoint checks plus console, database readiness)");
 }
 
 main().catch((error) => {
