@@ -10,9 +10,9 @@ function getScenarios() {
 }
 
 function runSimulation(selectedIds, rules) {
+    if (selectedIds?.some((id) => !scenarios.some((scenario) => scenario.id === id))) throw new TypeError("Unknown scenario ID");
     const selected = selectedIds?.length ? scenarios.filter((scenario) => selectedIds.includes(scenario.id)) : scenarios;
     if (!selected.length) throw new TypeError("No known simulation scenarios selected");
-    if (selectedIds?.some((id) => !scenarios.some((scenario) => scenario.id === id))) throw new TypeError("Unknown scenario ID");
     const sampleRows = selected.flatMap((scenario) => scenario.messages.map((message) => ({ scenarioId: scenario.id, expected: scenario.expected, message })));
     const replay = require("./ruleLabService").replayRules(rules, sampleRows.map((row) => row.message));
     const matched = new Set(replay.results.flatMap((rule) => rule.samples.map((sample) => sample.sampleIndex)));
