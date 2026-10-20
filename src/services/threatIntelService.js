@@ -14,7 +14,11 @@ class ThreatIntelligenceService {
      * Correlate sessions to find related scam attempts
      */
     async correlateSessions(sessionId) {
-        const session = await Session.findOne({ sessionId });
+        if (typeof sessionId !== 'string' || !sessionId.trim() || sessionId.length > 256) {
+            return { related: [], totalMatches: 0, confidence: 0 };
+        }
+        sessionId = sessionId.trim();
+        const session = await Session.findOne({ sessionId }).select('sessionId').lean();
         if (!session) {
             return { related: [], confidence: 0 };
         }
@@ -65,22 +69,39 @@ class ThreatIntelligenceService {
             relatedSessions.push(...phoneMatches);
         }
 
-        // Deduplicate and score matches
+        // URLs can connect campaigns even when phone numbers and UPI IDs differ.
+        if (identifiers.urls.size > 0) {
+            const urlMatches = await this._findSessionsByIdentifier(
+                'urls',
+                Array.from(identifiers.urls),
+                sessionId
+            );
+            relatedSessions.push(...urlMatches);
+        }
+
+        // Deduplicate by session and by identifier value so the same signal
+        // cannot inflate a session's score when it appears in multiple turns.
         const uniqueSessions = new Map();
         for (const match of relatedSessions) {
-            const key = match.sessionId;
-            if (!uniqueSessions.has(key)) {
-                uniqueSessions.set(key, match);
-            } else {
-                // Increase confidence if multiple identifiers match
-                const existing = uniqueSessions.get(key);
-                existing.matchScore += match.matchScore;
-                existing.matchedIdentifiers.push(...match.matchedIdentifiers);
+            if (!match || typeof match.sessionId !== 'string') continue;
+            if (!uniqueSessions.has(match.sessionId)) {
+                uniqueSessions.set(match.sessionId, { ...match, matchedIdentifiers: [] });
             }
+            const existing = uniqueSessions.get(match.sessionId);
+            const seen = new Set(existing.matchedIdentifiers.map((item) => `${item.type}:${item.value}`));
+            for (const item of Array.isArray(match.matchedIdentifiers) ? match.matchedIdentifiers : []) {
+                const key = `${item.type}:${item.value}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    existing.matchedIdentifiers.push(item);
+                }
+            }
+            existing.matchScore = existing.matchedIdentifiers.length * 50;
         }
 
         const related = Array.from(uniqueSessions.values())
-            .sort((a, b) => b.matchScore - a.matchScore);
+            .sort((a, b) => b.matchScore - a.matchScore)
+            .slice(0, 100);
 
         return {
             sessionId,
