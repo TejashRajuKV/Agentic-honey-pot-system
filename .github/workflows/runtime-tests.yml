@@ -73,6 +73,7 @@ jobs:
           npm run test:console-auth
           npm run test:smoke-deploy
           npm run test:investigation-analysis
+          npm run test:rule-lab
           npm run test:readiness -- 1
 
       - name: Run end-to-end API integration tests
