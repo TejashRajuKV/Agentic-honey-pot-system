@@ -5,7 +5,7 @@ const a = fingerprint(["Your account will be suspended immediately", "Verify you
 const b = fingerprint(["Your account is suspended immediately", "Verify account now"]);
 const c = fingerprint(["Please share the delivery address"]);
 assert.ok(a.terms.includes("account"));
-assert.ok(a.phrases.includes("account suspended") === false);
+assert.ok(a.phrases.includes("account suspended"));
 const similar = compareFingerprints(a, b);
 assert.ok(similar.score > 0);
 assert.ok(similar.sharedTerms.includes("account"));
