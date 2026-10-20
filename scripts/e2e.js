@@ -274,6 +274,22 @@ async function main() {
         const r = await get("/console/known-identifiers?limit=200");
         ok(r.data.data.some((k) => k.identifier === UPI), "identifier missing");
     });
+    await check("known-threat lookup rejects malformed or excessive identifier input", async () => {
+        for (const body of [[], { upiIds: "not-an-array" }, { phoneNumbers: [123] }, { urls: [""] }, { upiIds: Array(101).fill("x@y") }]) {
+            const r = await post("/intelligence/check", body);
+            ok(r.status === 400, `expected 400 for invalid identifier input, got ${r.status}: ${JSON.stringify(r.data)}`);
+        }
+        const tooLong = await post("/intelligence/check", { urls: ["x".repeat(2049)] });
+        ok(tooLong.status === 400, "oversized URL identifier should be rejected");
+    });
+    await check("threat-intelligence list endpoints bound query limits", async () => {
+        const badLimit = await get("/intelligence/threats?limit=not-a-number");
+        const zeroLimit = await get("/intelligence/network?limit=0");
+        const capped = await get("/intelligence/threats?limit=100000");
+        ok(badLimit.status === 400, `invalid limit returned ${badLimit.status}`);
+        ok(zeroLimit.status === 400, `zero limit returned ${zeroLimit.status}`);
+        ok(capped.status === 200, `oversized limit should be safely capped, got ${capped.status}`);
+    });
     await check("active threat feed + profiles filter", async () => {
         const t = await get("/intelligence/threats?limit=50&status=active");
         ok(t.status === 200 && t.data.data.some((p) => p.identifiers?.upiIds?.includes(UPI)), "not in threat feed");
