@@ -86,9 +86,17 @@ async function main() {
         const r = await post("/ml/scam", { message: "Your KYC will be suspended. Update immediately to avoid account freeze." });
         ok(r.status === 200 && r.data.confidence >= 50, JSON.stringify(r.data).slice(0, 200));
     });
+    await check("scam radar rejects non-string messages", async () => {
+        const r = await post("/ml/scam", { message: 12345 });
+        ok(r.status === 400 && r.data.label === "ERROR", JSON.stringify(r.data));
+    });
     await check("fake news", async () => {
         const r = await post("/ml/fakenews", { text: "Govt giving free Rs 5000 to everyone, forward this to 10 people urgently" });
         ok(r.status === 200 && typeof r.data.confidence === "number", JSON.stringify(r.data).slice(0, 200));
+    });
+    await check("fake news checker rejects non-string text", async () => {
+        const r = await post("/ml/fakenews", { text: { claim: "hello" } });
+        ok(r.status === 400 && r.data.label === "ERROR", JSON.stringify(r.data));
     });
     await check("phishing", async () => {
         const r = await post("/ml/phishing", { url: "http://secure-login-bank-india.com/update" });
