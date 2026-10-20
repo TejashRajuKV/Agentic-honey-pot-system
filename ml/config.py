@@ -7,8 +7,10 @@ load_dotenv()
 # ─────────────────────────────────────────
 # Server Config
 # ─────────────────────────────────────────
-PORT   = int(os.getenv("PORT", 5050))
-DEBUG  = os.getenv("DEBUG", "True") == "True"
+# Debug mode must be opt-in. Flask debug mode can expose interactive diagnostics
+# and should never be enabled implicitly in a deployed service.
+PORT = int(os.getenv("ML_PORT", os.getenv("PORT", "5050")))
+DEBUG = os.getenv("DEBUG", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 # ─────────────────────────────────────────
 # Base Paths
