@@ -104,6 +104,12 @@ async function main() {
         const r = await post("/ml/loan", { instant_approval: true, no_rbi_registration: true });
         ok(r.status === 200, `loan ${r.status}: ${JSON.stringify(r.data).slice(0, 200)}`);
     });
+    await check("loan scorer rejects ambiguous string booleans", async () => {
+        const r = await post("/ml/loan", { instant_approval: "false", no_rbi_registration: false });
+        ok(r.status === 400 && r.data.label === "ERROR", JSON.stringify(r.data));
+        const badName = await post("/ml/loan", { instant_approval: false, app_name: 123 });
+        ok(badName.status === 400, "non-string app_name should be rejected");
+    });
     await check("loan app reference matching does not falsely verify partial names", async () => {
         const falseMatch = await get("/ml/loan/check-app?name=fake%20SBI%20loan%20app");
         ok(falseMatch.status === 200 && falseMatch.data.db_status === "UNVERIFIED", JSON.stringify(falseMatch.data));
