@@ -395,7 +395,7 @@ const handleIncomingMessageUnlocked = async (req, res) => {
             await updateSession(sessionId, sessionUpdates);
 
             // FEATURE 5: Update cross-session intelligence (only if scam detected)
-            if (scamDetection.isScam && (intelligence.upiIds.length > 0 || intelligence.phoneNumbers.length > 0)) {
+            if (scamDetection.isScam && (intelligence.upiIds.length > 0 || intelligence.phoneNumbers.length > 0 || intelligence.urls.length > 0)) {
                 await updateScammerIntelligence(intelligence, sessionId, scamDetection);
                 await recordObservedIndicators(intelligence, sessionId, scamDetection);
                 await auditService.logIntelligenceExtracted(sessionId, intelligence);
