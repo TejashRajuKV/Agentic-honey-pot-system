@@ -187,6 +187,21 @@ async function main() {
         ok(r.status === 404, `got ${r.status}`);
     });
 
+    await check("analytics rejects invalid ranges and bounds expensive queries", async () => {
+        const badDays = await get("/analytics/heatmap?days=0");
+        const badTrends = await get("/analytics/trends?startDate=not-a-date");
+        const reversed = await get("/analytics/trends?startDate=2026-10-20&endDate=2026-10-01");
+        const badFormat = await get("/analytics/export?format=xml");
+        const badAggregate = await post("/analytics/aggregate", { date: "not-a-date" });
+        const capped = await get("/analytics/top-scammers?limit=100000");
+        ok(badDays.status === 400, `invalid days returned ${badDays.status}`);
+        ok(badTrends.status === 400, `invalid date returned ${badTrends.status}`);
+        ok(reversed.status === 400, `reversed date range returned ${reversed.status}`);
+        ok(badFormat.status === 400, `unsupported export format returned ${badFormat.status}`);
+        ok(badAggregate.status === 400, `invalid aggregation date returned ${badAggregate.status}`);
+        ok(capped.status === 200, `oversized analytics limit should be capped, got ${capped.status}`);
+    });
+
     console.log("\nHoneypot agent (browser path: /api/v1/console/*)");
     const soft = `${RUN}-soft`;
     const hard = `${RUN}-hard`;
