@@ -63,11 +63,10 @@ def behavior_detect():
         integer_fields = ("hour", "transactions", "new_device", "failed_logins")
         for field in integer_fields:
             value = data[field]
-            if (isinstance(value, bool) or not isinstance(value, (int, float))
-                    or not math.isfinite(value) or not value.is_integer() if isinstance(value, float) else False):
-                return jsonify(format_error("behavior_monitor", f"Field '{field}' must be an integer")), 400
             if isinstance(value, bool) or not isinstance(value, (int, float)):
                 return jsonify(format_error("behavior_monitor", f"Field '{field}' must be an integer")), 400
+            if isinstance(value, float) and (not math.isfinite(value) or not value.is_integer()):
+                return jsonify(format_error("behavior_monitor", f"Field '{field}' must be a finite integer")), 400
 
         amount = data["amount"]
         if isinstance(amount, bool) or not isinstance(amount, (int, float)):
