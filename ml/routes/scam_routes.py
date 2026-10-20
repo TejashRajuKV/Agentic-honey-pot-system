@@ -42,6 +42,10 @@ def scam_detect():
             ), 400
 
         message = data.get("message", "")
+        if not isinstance(message, str):
+            return jsonify(
+                format_error("scam_radar", "Field 'message' must be a string")
+            ), 400
 
         # ── Validate input ──
         if is_empty(message):
