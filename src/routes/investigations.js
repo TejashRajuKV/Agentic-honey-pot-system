@@ -10,6 +10,7 @@ const AuditLog = require("../models/AuditLog");
 const DetectionRule = require("../models/DetectionRule");
 const PlaybookRun = require("../models/PlaybookRun");
 const ruleLab = require("../services/ruleLabService");
+const simulationService = require("../services/simulationService");
 
 const SEVERITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 const CASE_STATUSES = ["open", "investigating", "contained", "resolved", "false_positive"];
@@ -469,6 +470,24 @@ router.post("/playbooks/execute", async (req, res) => {
     } catch (error) {
         if (error?.code === 11000) return res.status(409).json({ status: "error", message: "requestId has already been used" });
         res.status(500).json({ status: "error", message: "Approved playbook could not be completed" });
+    }
+});
+
+router.get("/simulation/scenarios", (_req, res) => {
+    res.json({ status: "success", data: simulationService.getScenarios() });
+});
+
+router.post("/simulation/run", async (req, res) => {
+    const scenarioIds = req.body?.scenarioIds;
+    if (scenarioIds !== undefined && (!Array.isArray(scenarioIds) || scenarioIds.length > 20 || scenarioIds.some((id) => typeof id !== "string" || id.length > 100))) {
+        return res.status(400).json({ status: "error", message: "scenarioIds must be an array of at most 20 scenario IDs" });
+    }
+    try {
+        const rules = await DetectionRule.find({ status: "enabled" }).limit(100).lean();
+        const result = simulationService.runSimulation(scenarioIds, rules);
+        res.json({ status: "success", data: result, productionChanged: false });
+    } catch (error) {
+        res.status(400).json({ status: "error", message: error instanceof TypeError ? error.message : "Unable to run simulation" });
     }
 });
 
