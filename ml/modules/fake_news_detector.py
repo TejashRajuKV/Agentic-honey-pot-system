@@ -131,7 +131,32 @@ def check_news(text: str, models: dict) -> dict:
         vectorizer = models.get("news_vec")
 
         if model is None or vectorizer is None:
-            return format_error("fake_news", "Fake news model not loaded")
+            # A deterministic heuristic fallback is safer than a 500/error when
+            # deployment omits the optional classifier artifact. Forwarding
+            # patterns alone are not treated as proof that a claim is false.
+            fake_flags = extract_fake_flags(text)
+            features = extract_features(text)
+            forward_info = detect_forward_pattern(text)
+            if len(fake_flags) >= 2:
+                confidence = 75
+            elif fake_flags:
+                confidence = 60
+            elif forward_info["is_forwarded"]:
+                confidence = 25
+            else:
+                confidence = 10
+            reason = build_news_reason(features, fake_flags, 1 if fake_flags else 0)
+            if forward_info["is_forwarded"]:
+                reason += " + Viral forwarding pattern (not proof of falsity)"
+            result = format_response(
+                module="fake_news",
+                confidence=confidence,
+                reason=reason + " (rule-based fallback; ML model unavailable)",
+                flagged_words=fake_flags
+            )
+            result["forward_detection"] = forward_info
+            result["detection_mode"] = "rule_based_fallback"
+            return result
 
         # ── Preprocess ──
         cleaned = clean_text(text)
