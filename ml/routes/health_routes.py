@@ -6,10 +6,11 @@ health_bp = Blueprint("health", __name__)
 
 @health_bp.route("/api/health", methods=["GET"])
 def health_check():
-    """Return explicit readiness for each ML module.
+    """Return explicit readiness for each CyberRakshak detection module.
 
     The gateway uses this endpoint for diagnostics. A missing optional model must
     be visible as partial readiness instead of being silently reported as loaded.
+    Composite/rule-based modules are reported separately from serialized ML models.
     """
     status = models_status()
     core_models = ("scam_radar", "behavior_monitor", "fake_news", "phishing_detector")
@@ -25,6 +26,9 @@ def health_check():
             "phishing_detector": bool(status.get("phishing_detector", False)),
             # Loan scoring is rule-based and does not require a serialized model.
             "loan_scorer": bool(status.get("loan_scorer", True)),
+            # Multi-Vector is a composite endpoint, not a separate model artifact.
+            # Its availability is tied to the Flask health response itself.
+            "multi_vector_analyzer": True,
         },
     }), 200
 
@@ -41,6 +45,7 @@ def version():
             "Fake News Checker",
             "Phishing Detector",
             "Loan Risk Scanner",
+            "Multi-Vector Threat Analyzer",
         ],
         "tech_stack": {
             "frontend": "React + Vite",
