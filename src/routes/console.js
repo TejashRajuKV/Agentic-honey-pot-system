@@ -7,6 +7,9 @@
 
 const express = require("express");
 const router = express.Router();
+const { createRateLimiter } = require("../middleware/rateLimit");
+const breachLookupRateLimit = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 10, maxKeys: 5000 });
+const analysisRateLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 30, maxKeys: 5000 });
 const { handleIncomingMessage } = require("../controllers/messageController");
 const { getConversationHistory, getSessionIntelligence } = require("../services/sessionService");
 const Session = require("../models/Session");
@@ -37,7 +40,7 @@ router.post("/messages", (req, res, next) => {
  * POST /api/v1/console/breach-check — is this email in a known data breach? (Have I Been Pwned)
  * The HIBP key lives on the server (HIBP_API_KEY); without it we say so instead of inventing results.
  */
-router.post("/breach-check", async (req, res) => {
+router.post("/breach-check", breachLookupRateLimit, async (req, res) => {
     const rawEmail = req.body?.email;
     if (typeof rawEmail !== "string" || rawEmail.length > 320) {
         return res.status(400).json({ status: "error", message: "A valid email address is required" });
@@ -90,7 +93,7 @@ router.post("/breach-check", async (req, res) => {
  * POST /api/v1/console/analyze — explain the risk of a single message WITHOUT starting a session.
  * Runs the same detection, emotion, extraction and ML layers the honeypot uses, and stores nothing.
  */
-router.post("/analyze", async (req, res) => {
+router.post("/analyze", analysisRateLimit, async (req, res) => {
     const text = req.body?.message;
     if (typeof text !== "string" || !text.trim()) {
         return res.status(400).json({ status: "error", message: "message (non-empty string) is required" });
