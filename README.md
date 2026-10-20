@@ -206,7 +206,19 @@ npm run test:readiness
 node tests/readiness/run.js 1
 ```
 
+The GitHub Actions workflow `.github/workflows/runtime-tests.yml` runs the frontend build, JavaScript syntax checks, focused security/service tests, staged readiness checks, and the end-to-end API suite against a temporary MongoDB service on pushes and pull requests to `main`.
+
 Tests have different prerequisites. The readiness suite may require MongoDB, browser binaries, Python dependencies, and model artifacts. Check the command's exit code and failure summary for your environment. **A test script existing is not evidence that it passes.** Run the relevant checks after making changes and before merging or deploying.
+
+### Verify a deployed service
+
+After the app has been deployed and its public URL is known, run the read-only smoke test:
+
+```bash
+npm run smoke:deploy -- https://your-deployed-host
+```
+
+It verifies API health, MongoDB connectivity, root health, that the React console is served, the message discovery route, rejection of a message POST without an API key, and the liveness ping. It does not create a session or submit a message. HTTPS is required except for localhost. A successful CI run validates the tested code in CI; it does not prove that a separately hosted production deployment or its secrets and external integrations are configured correctly.
 
 ## Repository structure
 
@@ -217,7 +229,7 @@ detection/             Scam detection and intelligence extraction
 ml/                    Python/Flask ML service, routes, training and model loader
 frontend/              React + Vite analyst console
 shared-contracts/      Shared constants and contracts
-scripts/               Development and end-to-end scripts
+scripts/               Development, end-to-end and deployment smoke-check scripts
 tests/                 Feature tests and staged readiness suite
 docs/                  Reference documentation and historical subsystem notes
 ```
