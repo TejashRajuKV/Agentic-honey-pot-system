@@ -20,7 +20,7 @@ const RULES = [
 
 // ── RBI Status colors ──
 const DB_STATUS_COLORS = {
-  RBI_VERIFIED: { color: "#00FF9D", bg: "rgba(0,255,157,0.08)", border: "rgba(0,255,157,0.3)" },
+  RBI_VERIFIED: { color: "#FFD000", bg: "rgba(255,208,0,0.06)", border: "rgba(255,208,0,0.25)" },
   BLACKLISTED:  { color: "#FF2D55", bg: "rgba(255,45,85,0.08)",  border: "rgba(255,45,85,0.3)"  },
   UNVERIFIED:   { color: "#FFD000", bg: "rgba(255,208,0,0.08)",  border: "rgba(255,208,0,0.3)"  },
   NOT_CHECKED:  { color: "#4A7090", bg: "transparent",           border: "rgba(74,112,144,0.2)" },
@@ -91,7 +91,7 @@ export default function LoanRiskScanner() {
 
   // ── DB Status label ──
   const getDbLabel = (status) => ({
-    RBI_VERIFIED: "✓ RBI VERIFIED — SAFE",
+    RBI_VERIFIED: "✓ REFERENCE MATCH — VERIFY OFFICIALLY",
     BLACKLISTED:  "✗ BLACKLISTED — DANGEROUS",
     UNVERIFIED:   "⚠ UNVERIFIED — CHECK MANUALLY",
     NOT_CHECKED:  "// NO APP NAME PROVIDED",
@@ -138,7 +138,7 @@ export default function LoanRiskScanner() {
           marginTop:     "6px",
           letterSpacing: "1px"
         }}>
-          // CHECKS AGAINST RBI VERIFIED + BLACKLISTED DATABASE
+          // LOCAL REFERENCE LIST ONLY — VERIFY LENDER STATUS WITH RBI
         </div>
       </div>
 
@@ -335,7 +335,7 @@ export default function LoanRiskScanner() {
               color:        "#00FF9D",
               lineHeight:   "1.8"
             }}>
-              ✓ VERIFIED SAFE — Registered with RBI. Always use official app from Play Store.
+              REFERENCE MATCH ONLY — This local list is not live RBI verification. Verify the lender and app publisher through official RBI sources.
             </div>
           )}
         </>
