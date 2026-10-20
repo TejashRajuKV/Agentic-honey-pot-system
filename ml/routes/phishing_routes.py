@@ -37,7 +37,12 @@ def phishing_detect():
                 format_error("phishing_detector", "No data provided")
             ), 400
 
-        url = data.get("url", "").strip()
+        raw_url = data.get("url", "")
+        if not isinstance(raw_url, str):
+            return jsonify(
+                format_error("phishing_detector", "Field 'url' must be a string")
+            ), 400
+        url = raw_url.strip()
 
         if not url:
             return jsonify(
