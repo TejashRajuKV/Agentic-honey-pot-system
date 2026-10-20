@@ -36,12 +36,15 @@ class ProfilerService {
         const identifiers = this._extractIdentifiers(scammerMessages);
 
         // Check if profile already exists
-        let profile = await ScammerProfile.findOne({
-            $or: [
-                { 'identifiers.upiIds': { $in: identifiers.upiIds } },
-                { 'identifiers.phoneNumbers': { $in: identifiers.phoneNumbers } }
-            ]
-        });
+        const identityClauses = [];
+        for (const [field, values] of Object.entries(identifiers)) {
+            if (Array.isArray(values) && values.length > 0) {
+                identityClauses.push({ [`identifiers.${field}`]: { $in: values } });
+            }
+        }
+        let profile = identityClauses.length
+            ? await ScammerProfile.findOne({ $or: identityClauses })
+            : null;
 
         if (!profile) {
             profile = new ScammerProfile({
@@ -65,6 +68,13 @@ class ProfilerService {
                 profile.psychologicalProfile,
                 psychological
             );
+            // Preserve identifiers discovered in later sessions instead of keeping
+            // only the first session's indicator set.
+            if (!profile.identifiers || typeof profile.identifiers !== 'object') profile.identifiers = {};
+            for (const [field, values] of Object.entries(identifiers)) {
+                const previous = Array.isArray(profile.identifiers[field]) ? profile.identifiers[field] : [];
+                profile.identifiers[field] = [...new Set([...previous, ...values])].slice(-500);
+            }
         }
 
         // A profile may be rebuilt after every scammer turn. Count a session only
@@ -479,6 +489,11 @@ class ProfilerService {
             identifiers.upiIds.push(...intel.upiIds);
             identifiers.phoneNumbers.push(...intel.phoneNumbers);
             identifiers.urls.push(...intel.urls);
+            // The shared extractor intentionally keeps its evaluator response shape;
+            // email extraction is added here for profile correlation only.
+            const knownUpiIds = new Set(intel.upiIds.map((value) => value.toLowerCase()));
+            const emails = message.text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+            identifiers.emailAddresses.push(...emails.filter((value) => !knownUpiIds.has(value.toLowerCase())));
         }
 
         // Deduplicate
