@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.response_formatter import format_response, format_error
@@ -131,26 +132,30 @@ def check_app_database(app_name: str) -> dict:
             "danger_reason": None
         }
 
-    app_lower = app_name.lower().strip()
+    # Match complete normalized names only. Substring matching made names such
+    # as "fake SBI loan app" appear RBI_VERIFIED merely because they contained
+    # "sbi", which is an unsafe false-positive for a financial safety checker.
+    normalize = lambda value: re.sub(r"[^a-z0-9]+", "", value.casefold())
+    app_normalized = normalize(app_name)
 
     for app in RBI_SAFE_APPS:
-        if app["name"] in app_lower or app_lower in app["name"]:
+        if app_normalized == normalize(app["name"]):
             return {
                 "app_name":      app["display"],
                 "db_status":     "RBI_VERIFIED",
                 "is_safe":       True,
-                "message":       f"{app['display']} is RBI registered and verified safe",
+                "message":       f"{app['display']} is listed in the platform's built-in reference list; independently verify the lender's current RBI status",
                 "app_type":      app["type"],
                 "danger_reason": None
             }
 
     for app in RBI_DANGEROUS_APPS:
-        if app["name"] in app_lower or app_lower in app["name"]:
+        if app_normalized == normalize(app["name"]):
             return {
                 "app_name":      app["display"],
                 "db_status":     "BLACKLISTED",
                 "is_safe":       False,
-                "message":       f"WARNING: {app['display']} is blacklisted",
+                "message":       f"WARNING: {app['display']} is listed in the platform's local risk list; verify against current official notices",
                 "app_type":      "Predatory Lender",
                 "danger_reason": app["reason"]
             }
