@@ -16,7 +16,10 @@ class AlertService {
     /**
      * Send alert based on event type
      */
-    async sendAlert(type, payload) {
+    async sendAlert(type, payload = {}) {
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+            return { sent: false, reason: 'invalid_payload' };
+        }
         // Get alert configuration
         let config = await AlertConfig.findOne();
 
@@ -36,13 +39,23 @@ class AlertService {
             });
         }
 
+        // Normalize older/incomplete persisted records before dispatch and statistics updates.
+        if (!config.triggers || typeof config.triggers !== 'object') config.triggers = {};
+        if (!Array.isArray(config.channels)) config.channels = ['log'];
+        if (!Array.isArray(config.history)) config.history = [];
+        if (!config.stats || typeof config.stats !== 'object') config.stats = {};
+        for (const field of ['totalAlertsSent', 'successfulDeliveries', 'failedDeliveries', 'retries', 'deadLetters']) {
+            if (!Number.isFinite(config.stats[field]) || config.stats[field] < 0) config.stats[field] = 0;
+        }
+        if (!Array.isArray(config.stats.latencySamples)) config.stats.latencySamples = [];
+
         if (!config.enabled) {
             return { sent: false, reason: 'alerts_disabled' };
         }
 
         // Check if this alert type is enabled
         const triggerKey = this._getTriggerKey(type);
-        if (!config.triggers[triggerKey]) {
+        if (!config.triggers?.[triggerKey]) {
             return { sent: false, reason: 'trigger_not_enabled' };
         }
 
@@ -93,7 +106,8 @@ class AlertService {
                     results.sent = true;
                 }
             } catch (error) {
-                results.channels[channel] = { success: false, error: error.message };
+                // Do not return arbitrary internal/network error text to API callers or persisted history.
+                results.channels[channel] = { success: false, error: 'Channel delivery failed' };
             }
         }
 
@@ -221,7 +235,7 @@ class AlertService {
 
             return {
                 success: false,
-                error: error.message,
+                error: destinationRejected ? 'Webhook destination rejected by security policy' : 'Webhook delivery failed',
                 latencyMs: Date.now() - started,
                 retries: retryCount
             };
