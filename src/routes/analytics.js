@@ -50,7 +50,7 @@ router.get('/trends', async (req, res) => {
         const trends = await analyticsService.getPatternTrends(range.start, range.end);
         res.json({ status: 'success', data: trends });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to retrieve analytics data' });
     }
 });
 
@@ -65,7 +65,7 @@ router.get('/heatmap', async (req, res) => {
         const heatmap = await analyticsService.getScamHeatmap(days);
         res.json({ status: 'success', data: heatmap });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to retrieve analytics data' });
     }
 });
 
@@ -80,7 +80,7 @@ router.get('/top-scammers', async (req, res) => {
         const scammers = await analyticsService.getTopScammers(limit);
         res.json({ status: 'success', data: scammers });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to retrieve analytics data' });
     }
 });
 
@@ -95,7 +95,7 @@ router.get('/language-stats', async (req, res) => {
         const stats = await analyticsService.getLanguageStats(days);
         res.json({ status: 'success', data: stats });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to retrieve analytics data' });
     }
 });
 
@@ -122,7 +122,7 @@ router.get('/export', async (req, res) => {
             res.json({ status: 'success', data });
         }
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to retrieve analytics data' });
     }
 });
 
@@ -141,7 +141,7 @@ router.post('/aggregate', async (req, res) => {
         const analytics = await analyticsService.aggregateDailyMetrics(targetDate);
         res.json({ status: 'success', data: analytics });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to retrieve analytics data' });
     }
 });
 
