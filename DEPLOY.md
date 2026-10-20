@@ -66,8 +66,9 @@ This document provides step-by-step deployment instructions for the Agentic Hone
    - Select "Deploy from GitHub repo"
 
 2. **Configure Service**
-   - Railway auto-detects Node.js
+   - Set build command: `npm ci && npm --prefix frontend ci && npm run build`
    - Set start command: `npm start`
+   - If this service hosts the ML engine too, install Python 3.10+ and run `python -m pip install -r requirements.txt` during the build. Otherwise configure a separately hosted ML service with `ML_AUTO_START=false` and `CYBERRAKSHAK_URL`.
 
 3. **Add MongoDB Plugin**
    - Click "New" → "Database" → "MongoDB"
