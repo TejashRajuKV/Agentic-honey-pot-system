@@ -72,8 +72,8 @@ function getPhaseGuidelines(phase) {
 /**
  * Build full prompt with conversation history
  */
-function buildAgentPrompt(userMessage, history, phase, categories) {
-    const systemPrompt = buildSystemPrompt(phase, categories);
+function buildAgentPrompt(userMessage, history, phase, categories, emotion = "neutral") {
+    const systemPrompt = buildSystemPrompt(phase, categories, emotion);
 
     let conversationContext = '';
     if (history.length > 0) {
@@ -89,5 +89,6 @@ function buildAgentPrompt(userMessage, history, phase, categories) {
 module.exports = {
     buildSystemPrompt,
     buildAgentPrompt,
-    getPhaseGuidelines
+    getPhaseGuidelines,
+    selectAdaptivePersona
 };
