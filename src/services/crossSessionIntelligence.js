@@ -54,8 +54,23 @@ async function checkKnownScammer(upiIds = [], phoneNumbers = []) {
  */
 async function updateScammerIntelligence(intelligence, sessionId, scamContext) {
     try {
-        const { upiIds = [], phoneNumbers = [] } = intelligence;
-        const { confidence = 0, riskLevel = 'MEDIUM', categories = [] } = scamContext;
+        if (!intelligence || typeof intelligence !== 'object' || Array.isArray(intelligence) ||
+            typeof sessionId !== 'string' || !sessionId.trim() || sessionId.length > 200) {
+            return;
+        }
+        const cleanValues = (values) => Array.isArray(values)
+            ? [...new Set(values.filter((value) => typeof value === 'string' && value.trim() && value.length <= 256))].slice(0, 50)
+            : [];
+        const upiIds = cleanValues(intelligence.upiIds);
+        const phoneNumbers = cleanValues(intelligence.phoneNumbers);
+        const context = scamContext && typeof scamContext === 'object' ? scamContext : {};
+        const confidenceValue = Number(context.confidence);
+        const confidence = Number.isFinite(confidenceValue) ? Math.max(0, Math.min(1, confidenceValue)) : 0;
+        const allowedRiskLevels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+        const riskLevel = allowedRiskLevels.includes(context.riskLevel) ? context.riskLevel : 'MEDIUM';
+        const categories = Array.isArray(context.categories)
+            ? [...new Set(context.categories.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.slice(0, 100)))].slice(0, 50)
+            : [];
 
         // Update each UPI ID
         for (const upiId of upiIds) {
