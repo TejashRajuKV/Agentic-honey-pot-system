@@ -72,9 +72,19 @@ def behavior_detect():
         if isinstance(amount, bool) or not isinstance(amount, (int, float)):
             return jsonify(format_error("behavior_monitor", "Field 'amount' must be a number")), 400
 
+        try:
+            numeric_amount = float(amount)
+        except (OverflowError, ValueError):
+            return jsonify(format_error("behavior_monitor", "Amount is outside the supported numeric range")), 400
+
+        if not math.isfinite(numeric_amount) or numeric_amount > 1e15:
+            return jsonify(format_error("behavior_monitor", "Amount must be finite and no greater than 1e15")), 400
+        if data["transactions"] > 1000000 or data["failed_logins"] > 1000000:
+            return jsonify(format_error("behavior_monitor", "Transaction and failed-login counts cannot exceed 1000000")), 400
+
         behavior_data = {
             "hour": int(data["hour"]),
-            "amount": float(amount),
+            "amount": numeric_amount,
             "transactions": int(data["transactions"]),
             "new_device": int(data["new_device"]),
             "failed_logins": int(data["failed_logins"])
