@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import api from "../../api/api";
 
 const ROOT = "/api/v1/investigations";
-const tabs = ["overview", "cases", "copilot", "url triage", "rule lab", "feedback"];
+const tabs = ["overview", "cases", "copilot", "url triage", "rule lab", "simulation", "privacy", "feedback"];
 const card = { border: "1px solid var(--border-color, rgba(127,127,127,.28))", borderRadius: 12, padding: 16, minWidth: 0 };
 const field = { width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border-color, #8886)", background: "var(--panel-bg, transparent)", color: "inherit", font: "inherit" };
 const button = { padding: "9px 13px", borderRadius: 8, border: "1px solid var(--border-color, #8886)", background: "var(--panel-bg, transparent)", color: "inherit", cursor: "pointer", font: "inherit" };
@@ -28,6 +28,10 @@ export default function InvestigationCenter() {
   const [feedbackNote, setFeedbackNote] = useState("");
   const [copilotSession, setCopilotSession] = useState("");
   const [copilotResult, setCopilotResult] = useState(null);
+  const [simulationResult, setSimulationResult] = useState(null);
+  const [privacyText, setPrivacyText] = useState("Contact me at example@example.com or use token=abc123.");
+  const [redactionResult, setRedactionResult] = useState(null);
+  const [retentionPreview, setRetentionPreview] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -84,6 +88,24 @@ export default function InvestigationCenter() {
       setActive("rule lab");
     }, "Rule replay completed without changing production detection.");
   };
+
+  const runSimulation = () => run(async () => {
+    const response = await api.post(`${ROOT}/simulation/run`, {});
+    setSimulationResult(response.data?.data || null);
+    setActive("simulation");
+  }, "Synthetic offline simulation completed.");
+
+  const runRedaction = () => run(async () => {
+    const response = await api.post(`${ROOT}/privacy/redact`, { text: privacyText });
+    setRedactionResult(response.data?.data || null);
+    setActive("privacy");
+  }, "PII redaction preview completed.");
+
+  const previewRetention = () => run(async () => {
+    const response = await api.get(`${ROOT}/privacy/retention/preview`);
+    setRetentionPreview(response.data?.data || null);
+    setActive("privacy");
+  }, "Retention preview completed. No records were changed.");
 
   const investigateSession = (event) => {
     event.preventDefault();
@@ -198,6 +220,16 @@ export default function InvestigationCenter() {
         </form>
         {replay && <div style={card}><h3 style={{ marginTop: 0 }}>Replay results</h3><p>{replay.ruleCount} rules · {replay.sampleCount} samples · {replay.matchedSamples} samples matched at least one rule</p>{replay.results.map((result) => <div key={result.ruleId || result.name} style={{ borderTop: "1px solid #8883", padding: "10px 0" }}><strong>{result.name}</strong> — {result.matches} matches ({Math.round(result.matchRate * 100)}%)<div style={{ opacity: .7, fontSize: 12 }}>{result.type} · {result.severity}</div></div>)}</div>}
         <div style={card}><h3 style={{ marginTop: 0 }}>Saved rules ({rules.length})</h3>{rules.map((rule) => <div key={rule.ruleId} style={{ display: "flex", justifyContent: "space-between", gap: 10, borderTop: "1px solid #8883", padding: "8px 0", flexWrap: "wrap" }}><span>{rule.name} <small style={{ opacity: .65 }}>v{rule.version}</small></span><span>{rule.status} · {rule.severity}</span></div>)}{!rules.length && <p style={{ opacity: .7 }}>No saved rules yet. Rules can be created through the authenticated API.</p>}</div>
+      </div>}
+
+      {active === "simulation" && <div style={{ display: "grid", gap: 14 }}>
+        <div style={card}><h3 style={{ marginTop: 0 }}>Offline attack-pattern simulator</h3><p style={{ opacity: .72 }}>Run synthetic phishing, payment-impersonation and benign examples against enabled detection rules. No external systems are contacted and no production settings are changed.</p><button style={button} onClick={runSimulation} disabled={loading}>Run all synthetic scenarios</button></div>
+        {simulationResult && <><div style={card}><h3 style={{ marginTop: 0 }}>Simulation summary</h3><p>{simulationResult.summary.scenarios} scenarios · {simulationResult.summary.messages} messages · {simulationResult.summary.messagesMatched} matched · {Math.round(simulationResult.summary.messageMatchRate * 100)}% message match rate</p><p>Benign messages matched: {simulationResult.summary.benignMessagesMatched}</p><small>{simulationResult.disclaimer}</small></div><div style={card}>{simulationResult.scenarios.map((scenario) => <div key={scenario.id} style={{ borderTop: "1px solid #8883", padding: "10px 0" }}><strong>{scenario.name}</strong><div>{scenario.outcome.replaceAll("_", " ")} · coverage {Math.round(scenario.coverage * 100)}%</div><small style={{ opacity: .7 }}>Expected category: {scenario.expected} · {scenario.matches.join(", ") || "No rule matches"}</small></div>)}</div></>}
+      </div>}
+
+      {active === "privacy" && <div style={{ display: "grid", gap: 14 }}>
+        <div style={card}><h3 style={{ marginTop: 0 }}>Privacy redaction preview</h3><p style={{ opacity: .72 }}>Mask common email, phone, UPI and sensitive URL parameter values before sharing text with an external service.</p><textarea style={{ ...field, minHeight: 120 }} value={privacyText} onChange={(e) => setPrivacyText(e.target.value)} maxLength={50000}/><div style={{ marginTop: 10 }}><button style={button} onClick={runRedaction} disabled={loading}>Preview redaction</button></div>{redactionResult && <div style={{ marginTop: 12 }}><strong>Redacted output</strong><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{redactionResult.redactedText}</pre><small>Redactions: {Object.entries(redactionResult.counts).map(([key,value]) => `${key} ${value}`).join(" · ")}</small></div>}</div>
+        <div style={card}><h3 style={{ marginTop: 0 }}>Retention policy preview</h3><p style={{ opacity: .72 }}>The default target is 365 days. This preview estimates old records; it does not delete anything.</p><button style={button} onClick={previewRetention} disabled={loading}>Preview records older than policy</button>{retentionPreview && <div style={{ marginTop: 12 }}><p>Cutoff: {new Date(retentionPreview.cutoff).toLocaleString()} · {retentionPreview.retentionDays} days</p>{Object.entries(retentionPreview.candidateCounts).map(([key,value]) => <div key={key} style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #8883", padding: "7px 0" }}><span>{key.replaceAll(/([A-Z])/g, " $1")}</span><strong>{value}</strong></div>)}<strong>Total candidate records: {retentionPreview.totalCandidateRecords}</strong><p><small>{retentionPreview.note}</small></p></div>}</div>
       </div>}
 
       {active === "feedback" && <div style={{ display: "grid", gap: 14 }}>
