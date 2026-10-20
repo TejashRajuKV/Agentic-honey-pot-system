@@ -181,7 +181,30 @@ def predict_scam(text: str, models: dict) -> dict:
         vectorizer = models.get("scam_vec")
 
         if model is None or vectorizer is None:
-            return format_error("scam_radar", "Scam model not loaded")
+            # Keep the endpoint usable when optional serialized artifacts are not
+            # deployed. This is explicitly heuristic scoring, not an ML prediction.
+            flagged_words = extract_flagged_words(text)
+            features = extract_features(text)
+            reason = build_reason(features)
+            category = classify_scam_category(text)
+            if category in HIGH_SEVERITY:
+                confidence = 75 if flagged_words else 55
+            elif category in MEDIUM_SEVERITY:
+                confidence = 65 if flagged_words else 45
+            elif category in LOW_SEVERITY:
+                confidence = 55 if flagged_words else 35
+            else:
+                confidence = 10
+            result = format_response(
+                module="scam_radar",
+                confidence=confidence,
+                reason=(reason or "No strong rule-based scam indicators found") + " (rule-based fallback; ML model unavailable)",
+                flagged_words=flagged_words
+            )
+            result["scam_category"] = category
+            result["scam_category_color"] = get_category_color(category)
+            result["detection_mode"] = "rule_based_fallback"
+            return result
 
         # ── Clean ONLY for ML model ──
         cleaned = clean_text(text)
