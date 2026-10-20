@@ -36,9 +36,9 @@ const scammerIntelSchema = new Schema({
     // Status
     isBlacklisted: { type: Boolean, default: false },
     notes: String
-});
+}, { optimisticConcurrency: true });
 
 // Create compound index for efficient lookups
-scammerIntelSchema.index({ upiId: 1, phoneNumber: 1 }, { optimisticConcurrency: true });
+scammerIntelSchema.index({ upiId: 1, phoneNumber: 1 });
 
 module.exports = mongoose.model("ScammerIntelligence", scammerIntelSchema);
