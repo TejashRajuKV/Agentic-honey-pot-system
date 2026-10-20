@@ -31,7 +31,7 @@ router.get('/stats/:sessionId', async (req, res) => {
         const stats = await languageService.getLanguageStats(req.params.sessionId);
         res.json({ status: 'success', data: stats });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process language request' });
     }
 });
 
@@ -50,7 +50,7 @@ router.post('/analyze-hinglish', async (req, res) => {
         const analysis = languageService.handleHinglish(text);
         res.json({ status: 'success', data: analysis });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process language request' });
     }
 });
 
@@ -65,7 +65,7 @@ router.get('/scam-phrases', async (req, res) => {
         const phrases = languageService.getCommonScamPhrases(language);
         res.json({ status: 'success', data: phrases });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to process language request' });
     }
 });
 
