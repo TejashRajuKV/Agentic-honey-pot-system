@@ -297,11 +297,17 @@ class AlertService {
                     alert: {
                         severity: 'HIGH',
                         title: 'Cross-Session Threat Match',
-                        message: `Scammer identified across ${data.matchCount} sessions`,
+                        message: data.incidentId
+                            ? `Incident ${data.incidentId} has now spread to ${data.sessions?.length || data.matchCount || 2} sessions`
+                            : `Scammer identified across ${data.matchCount || data.sessions?.length || 2} sessions`,
+                        incidentId: data.incidentId,
                         profileId: data.profileId,
-                        matchCount: data.matchCount,
+                        riskScore: data.riskScore,
+                        scamType: data.scamType,
+                        matchCount: data.matchCount ?? data.sessions?.length,
                         sessions: data.sessions,
-                        sharedIdentifiers: data.sharedIdentifiers
+                        sharedIdentifiers: data.sharedIdentifiers,
+                        identifiers: data.identifiers
                     }
                 };
 
@@ -332,20 +338,7 @@ class AlertService {
                     }
                 };
 
-            case 'cross_session':
-                return {
-                    ...basePayload,
-                    alert: {
-                        severity: 'HIGH',
-                        title: 'Same Scammer Across Multiple Victims',
-                        message: `Incident ${data.incidentId} has now spread to ${data.sessions?.length || 2} sessions`,
-                        incidentId: data.incidentId,
-                        riskScore: data.riskScore,
-                        scamType: data.scamType,
-                        sessions: data.sessions,
-                        identifiers: data.identifiers
-                    }
-                };
+
 
             case 'multiple_victims':
                 return {
