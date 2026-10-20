@@ -17,7 +17,7 @@ export const engageAgent = (sessionId, message) =>
     client.post("/console/messages", { sessionId, message }).then((r) => r.data);
 
 export const analyzeMessage = (message) => client.post("/console/analyze", { message }).then(data);
-export const getIntelSummary = () => axios.get(ENDPOINTS.INTELLIGENCE_SUMMARY, { timeout: 30000 }).then(data);
+export const getIntelSummary = () => client.get(ENDPOINTS.INTELLIGENCE_SUMMARY.replace(/^\/api\/v1/, "")).then(data);
 
 export const assessRisk = (input) => client.post("/console/risk", input).then(data);
 export const getKillChain = (id) => client.get(`/console/sessions/${encodeURIComponent(id)}/killchain`).then(data);
