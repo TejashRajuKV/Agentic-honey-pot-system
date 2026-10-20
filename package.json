@@ -20,7 +20,8 @@
     "test:console-auth": "node tests/console-auth.js",
     "smoke:deploy": "node scripts/smoke-deploy.js",
     "test:smoke-deploy": "node scripts/smoke-deploy.test.js",
-    "test:investigation-analysis": "node tests/investigation-analysis.js"
+    "test:investigation-analysis": "node tests/investigation-analysis.js",
+    "test:rule-lab": "node tests/rule-lab.js"
   },
   "keywords": [
     "honeypot",
