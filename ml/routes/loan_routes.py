@@ -80,12 +80,6 @@ def loan_score():
         # ── Score loan ──
         result = score_loan(app_data)
 
-        # ── Add explanation ──
-        result["explanation"] = explain_loan(
-            app_data,
-            result["confidence"]
-        )
-
         # ── Add database result ──
         result["app_database"] = app_db
 
@@ -94,11 +88,17 @@ def loan_score():
             result["confidence"] = max(result["confidence"], 90)
             result["label"]      = "HIGH RISK"
             result["risk_color"] = "red"
-            result["reason"]     = f"RBI BLACKLISTED — {app_db['danger_reason']}"
+            result["reason"]     = f"Local risk-list match — {app_db['danger_reason']}"
 
         # A local reference-list match must never override observed risk factors.
         # In particular, don't cap a high-risk checklist result just because the
         # entered app name matches a known brand; brand-name spoofing is possible.
+        # Build the explanation only after all overrides so its confidence matches
+        # the final score returned to the frontend.
+        result["explanation"] = explain_loan(
+            app_data,
+            result["confidence"]
+        )
 
         return jsonify(result), 200
 
