@@ -132,6 +132,10 @@ const scammerProfileSchema = new Schema({
     // Notes and tags
     tags: [String],
     notes: String
+}, {
+    // Reject stale saves instead of silently replacing a profile changed by
+    // another request. profilerService retries bounded version conflicts.
+    optimisticConcurrency: true
 });
 
 // Compound indexes for efficient queries
