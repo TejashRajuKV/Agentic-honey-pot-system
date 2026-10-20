@@ -127,7 +127,7 @@ router.post("/analyze", analysisRateLimit, async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        res.status(500).json({ status: "error", message: "Unable to analyze message" });
     }
 });
 
