@@ -35,9 +35,14 @@ router.all("/*path", async (req, res) => {
         const text = await upstream.text();
         res.status(upstream.status).type(upstream.headers.get("content-type") || "application/json").send(text);
     } catch (err) {
-        res.status(503).json({
-            error: "CyberRakshak ML engine unreachable",
-            detail: err.name === "AbortError" ? "timed out" : err.message,
+        // Do not expose internal network errors, hostnames, or implementation details.
+        const timedOut = err?.name === "AbortError";
+        res.status(timedOut ? 504 : 503).json({
+            status: "error",
+            code: timedOut ? "ML_ENGINE_TIMEOUT" : "ML_ENGINE_UNAVAILABLE",
+            error: timedOut
+                ? "CyberRakshak ML engine timed out"
+                : "CyberRakshak ML engine is temporarily unavailable",
         });
     } finally {
         clearTimeout(timer);
