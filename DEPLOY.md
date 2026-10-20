@@ -35,7 +35,8 @@ This document provides step-by-step deployment instructions for the Agentic Hone
    - Connect your GitHub repository
 
 2. **Configure Build Settings**
-   - Build Command: `npm install && npm run build`
+   - Build Command (Node + frontend): `npm ci && npm --prefix frontend ci && npm run build`
+   - If this service also runs the Python ML engine, install its dependencies during build with `python -m pip install -r requirements.txt`. If Python is not available on the host, use the separate-ML setup below.
    - Start Command: `npm start`
    - Runtime requirements: Node.js 18+, Python 3.10+, and the packages in `requirements.txt` if the gateway will supervise the ML engine.
    - If the host cannot run Python, deploy the ML service separately, install its Python dependencies there, and set `ML_AUTO_START=false` plus `CYBERRAKSHAK_URL` on the gateway.
@@ -108,7 +109,9 @@ This document provides step-by-step deployment instructions for the Agentic Hone
    ```bash
    heroku config:set API_KEY=your_secure_api_key_here
    heroku config:set NODE_ENV=production
-   heroku config:set EVALUATION_CALLBACK_URL=https://your-endpoint.com/callback
+   heroku config:set CONSOLE_PASSWORD='use-a-unique-password-at-least-12-characters'
+   heroku config:set CONSOLE_SESSION_SECRET='generate-at-least-32-random-bytes'
+   # Leave EVALUATION_CALLBACK_URL unset to use the default evaluator.
    ```
 
 5. **Deploy**
@@ -128,7 +131,8 @@ This builds the React console and checks the production database URI, API key, c
 
 ## 🔒 Security Checklist
 
-- [ ] Change default API key to a strong, random value
+- [ ] Change the API key to a unique random secret of at least 32 characters
+- [ ] Set CONSOLE_PASSWORD (at least 12 characters) and CONSOLE_SESSION_SECRET (at least 32 random bytes)
 - [ ] Use environment variables for all secrets
 - [ ] Enable HTTPS (automatic on Render/Railway)
 - [ ] Whitelist specific IPs in MongoDB if possible
