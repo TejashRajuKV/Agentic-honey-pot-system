@@ -67,14 +67,30 @@ def loan_score():
                 format_error("loan_scorer", "No valid fields provided")
             ), 400
 
-        # ── Normalize to bool ──
-        app_data = {
-            key: bool(data.get(key, False))
-            for key in valid_keys
-        }
+        # Accept explicit booleans (and JSON numeric 0/1) only. Python's
+        # bool("false") is True, which would otherwise turn client strings into
+        # fabricated risk indicators and inflate the score.
+        app_data = {}
+        for key in valid_keys:
+            value = data.get(key, False)
+            if isinstance(value, bool):
+                app_data[key] = value
+            elif isinstance(value, int) and value in (0, 1):
+                app_data[key] = bool(value)
+            else:
+                return jsonify(
+                    format_error("loan_scorer", f"Field '{key}' must be a boolean")
+                ), 400
 
         # ── Get app name if provided ──
-        app_name = data.get("app_name", "").strip()
+        raw_app_name = data.get("app_name", "")
+        if raw_app_name is None:
+            raw_app_name = ""
+        if not isinstance(raw_app_name, str):
+            return jsonify(
+                format_error("loan_scorer", "Field 'app_name' must be a string")
+            ), 400
+        app_name = raw_app_name.strip()
         app_db   = check_app_database(app_name)
 
         # ── Score loan ──
