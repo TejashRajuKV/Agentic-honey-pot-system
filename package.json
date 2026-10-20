@@ -8,6 +8,7 @@
     "dev": "node scripts/dev.js",
     "build": "npm --prefix frontend run build",
     "build:start": "npm run build && npm start",
+    "release:check": "npm run build && node scripts/preflight.js --production",
     "install:all": "npm install && npm --prefix frontend install && python -m pip install -r requirements.txt",
     "test:e2e": "node scripts/e2e.js",
     "test": "node scripts/e2e.js",
