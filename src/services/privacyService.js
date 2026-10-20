@@ -16,7 +16,7 @@ function redactText(raw) {
     const replace = (regex, replacement, key) => {
         text = text.replace(regex, (...args) => { counts[key] += 1; return typeof replacement === "function" ? replacement(...args) : replacement; });
     };
-    replace(/\b([a-z0-9._%+-])[a-z0-9._%+-]*@([a-z0-9.-]+\.[a-z]{2,})\b/gi, "$1***@$2", "email");
+    replace(/\b([a-z0-9._%+-]+)@([a-z0-9.-]+\.[a-z]{2,})\b/gi, (_match, local, domain) => `${local[0]}***@${domain}`, "email");
     replace(/\b(?:\+?\d[\s().-]*){9,15}\b/g, "[REDACTED_PHONE]", "phone");
     replace(/\b[a-z0-9._-]{2,}@[a-z]{2,}\b/gi, "[REDACTED_UPI]", "upi");
     text = text.replace(/([?&](?:token|access_token|refresh_token|api[_-]?key|password|passwd|otp|code|secret)=)[^&#\s]*/gi, (_match, prefix) => {
