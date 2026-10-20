@@ -2,6 +2,7 @@
 // profiles, threat intel, alerts, quality, language). Same-origin: served by the gateway.
 
 import axios from "axios";
+import ENDPOINTS from "./endpoints";
 
 const client = axios.create({
     baseURL: "/api/v1",
@@ -16,7 +17,7 @@ export const engageAgent = (sessionId, message) =>
     client.post("/console/messages", { sessionId, message }).then((r) => r.data);
 
 export const analyzeMessage = (message) => client.post("/console/analyze", { message }).then(data);
-export const getIntelSummary = () => client.get("/console/intelligence/summary").then(data);
+export const getIntelSummary = () => axios.get(ENDPOINTS.INTELLIGENCE_SUMMARY, { timeout: 30000 }).then(data);
 
 export const assessRisk = (input) => client.post("/console/risk", input).then(data);
 export const getKillChain = (id) => client.get(`/console/sessions/${encodeURIComponent(id)}/killchain`).then(data);
