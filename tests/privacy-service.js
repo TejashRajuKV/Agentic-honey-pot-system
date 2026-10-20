@@ -1,0 +1,22 @@
+const assert = require("node:assert/strict");
+const { redactText, configuredRetentionDays, MIN_RETENTION_DAYS, MAX_RETENTION_DAYS } = require("../src/services/privacyService");
+
+const result = redactText("Email: tejash@example.com, call +1 (555) 123-4567, UPI: sample123@bank, URL: https://example.com/?token=secret&next=home");
+assert.match(result.redactedText, /t\*\*\*@example\.com/);
+assert.match(result.redactedText, /\[REDACTED_PHONE\]/);
+assert.match(result.redactedText, /\[REDACTED_UPI\]/);
+assert.match(result.redactedText, /token=\[REDACTED\]/);
+assert.equal(result.counts.email, 1);
+assert.equal(result.counts.phone, 1);
+assert.equal(result.counts.upi, 1);
+assert.equal(result.counts.sensitiveUrlParameter, 1);
+assert.equal(result.changed, true);
+assert.equal(redactText("Nothing private here").changed, false);
+assert.throws(() => redactText(42), /text must be a string/);
+assert.throws(() => redactText("x".repeat(50001)), /50000 characters/);
+assert.equal(configuredRetentionDays("90"), 90);
+assert.equal(configuredRetentionDays("2"), 365);
+assert.equal(configuredRetentionDays("nope"), 365);
+assert.equal(MIN_RETENTION_DAYS, 30);
+assert.equal(MAX_RETENTION_DAYS, 3650);
+console.log("Privacy service checks passed (16 assertions).");
