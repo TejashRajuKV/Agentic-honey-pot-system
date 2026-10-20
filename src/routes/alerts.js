@@ -5,6 +5,13 @@ const alertService = require('../services/alertService');
 const AlertConfig = require('../models/AlertConfig');
 const { validateWebhookUrl } = require('../utils/webhookUrlPolicy');
 
+function boundedAlertLimit(value) {
+    if (value === undefined || value === '') return 50;
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1) return null;
+    return Math.min(parsed, 100);
+}
+
 function safeConfigResponse(config) {
     const data = config.toObject ? config.toObject() : { ...config };
     if (data.auth) data.auth = { ...data.auth, token: data.auth.token ? '••••••••' : '' };
@@ -92,8 +99,9 @@ router.post('/test', async (req, res) => {
  */
 router.get('/history', async (req, res) => {
     try {
-        const { limit = 50 } = req.query;
-        const history = await alertService.getAlertHistory(parseInt(limit));
+        const limit = boundedAlertLimit(req.query.limit);
+        if (limit === null) return res.status(400).json({ status: 'error', message: 'limit must be a positive integer' });
+        const history = await alertService.getAlertHistory(limit);
         res.json({ status: 'success', data: history, count: history.length });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
