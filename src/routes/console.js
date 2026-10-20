@@ -274,9 +274,16 @@ router.get("/campaigns", async (req, res) => {
 /** GET /api/v1/console/stix?sessionId=&download=true — STIX 2.1 bundle of the harvested intelligence */
 router.get("/stix", async (req, res) => {
     try {
-        const bundle = await stix.buildBundle({ sessionId: req.query.sessionId });
+        const { sessionId, download } = req.query;
+        if (sessionId !== undefined && (typeof sessionId !== "string" || !sessionId.trim() || sessionId.length > 200)) {
+            return res.status(400).json({ status: "error", message: "sessionId must be a non-empty string of at most 200 characters" });
+        }
+        if (download !== undefined && !["true", "false"].includes(download)) {
+            return res.status(400).json({ status: "error", message: "download must be true or false" });
+        }
+        const bundle = await stix.buildBundle({ sessionId });
         res.setHeader("Content-Type", "application/stix+json;version=2.1");
-        if (req.query.download === "true") res.setHeader("Content-Disposition", "attachment; filename=cyberrakshak_stix_bundle.json");
+        if (download === "true") res.setHeader("Content-Disposition", "attachment; filename=cyberrakshak_stix_bundle.json");
         res.send(JSON.stringify(bundle, null, 2));
     } catch (error) {
         res.status(500).json({ status: "error", message: error.message });
