@@ -430,7 +430,7 @@ class AlertService {
     /**
      * Test webhook configuration
      */
-    async testWebhook(webhookUrl, authConfig = null) {
+    async testWebhook(webhookUrl, authConfig = null, requestWebhook = requestValidatedWebhook) {
         const testPayload = {
             event: 'test',
             timestamp: new Date().toISOString(),
@@ -461,7 +461,7 @@ class AlertService {
                 }
             }
 
-            const response = await requestValidatedWebhook(webhookUrl, {
+            const response = await requestWebhook(webhookUrl, {
                 method: 'POST', headers, body: JSON.stringify(testPayload), timeoutMs: 5000
             });
 
