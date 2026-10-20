@@ -21,6 +21,7 @@ import Quality          from "../modules/honeypot/Quality";
 import LanguageLab      from "../modules/honeypot/LanguageLab";
 import Reports          from "../modules/honeypot/Reports";
 import Integrations     from "../modules/honeypot/Integrations";
+import InvestigationCenter from "../modules/honeypot/InvestigationCenter";
 import Forensic3DScene  from "../components/Forensic3DScene";
 import GuardianSetup    from "../components/GuardianSetup";
 import SketchDefs       from "../components/SketchDefs";
@@ -67,6 +68,9 @@ const MODULES = [
   ]},
   { id: "reports", label: "REPORTS", subs: [
     { id: "archive", label: "CASE REPORTS", render: (c) => <Reports openSession={(id) => c.go("honeypot", "cases", { sessionId: id })} /> },
+  ]},
+  { id: "investigation", label: "INVESTIGATION & RESPONSE", subs: [
+    { id: "center", label: "CASE MANAGEMENT & RULE LAB", render: () => <InvestigationCenter /> },
   ]},
   { id: "integrations", label: "INTEGRATIONS", subs: [
     { id: "status", label: "STATUS", render: () => <Integrations /> },
