@@ -5,6 +5,8 @@ const http = require("node:http");
 const https = require("node:https");
 
 const blockedRanges = new net.BlockList();
+const globalIpv6Ranges = new net.BlockList();
+globalIpv6Ranges.addSubnet("2000::", 3, "ipv6");
 [
     ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10],
     ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12],
@@ -42,6 +44,7 @@ function isPublicAddress(address) {
         const mapped = mappedIpv4Address(address);
         if (mapped) return isPublicAddress(mapped);
     }
+    if (family === 6 && !globalIpv6Ranges.check(address, "ipv6")) return false;
     return !blockedRanges.check(address, family === 4 ? "ipv4" : "ipv6");
 }
 
