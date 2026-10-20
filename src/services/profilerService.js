@@ -434,21 +434,46 @@ class ProfilerService {
     /**
      * Merge behavioral data from multiple sessions
      */
-    _mergeBehavioral(existing, newData) {
+    _mergeBehavioral(existing = {}, newData = {}) {
+        // Older profile documents may predate nested fields introduced by later
+        // schema versions. Normalize every collection before merging so one legacy
+        // record cannot prevent profile refreshes for an otherwise valid session.
+        const previous = existing && typeof existing === 'object' ? existing : {};
+        const incoming = newData && typeof newData === 'object' ? newData : {};
+        const previousTime = previous.timePatterns && typeof previous.timePatterns === 'object'
+            ? previous.timePatterns
+            : {};
+        const incomingTime = incoming.timePatterns && typeof incoming.timePatterns === 'object'
+            ? incoming.timePatterns
+            : {};
+        const uniqueStrings = (a, b, limit = 500) => [...new Set([
+            ...(Array.isArray(a) ? a : []),
+            ...(Array.isArray(b) ? b : [])
+        ].filter((value) => typeof value === 'string' && value.trim()))].slice(-limit);
+        const numeric = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
+
         return {
-            languagePatterns: [...new Set([...existing.languagePatterns, ...newData.languagePatterns])],
-            signaturePhrases: [...new Set([...existing.signaturePhrases, ...newData.signaturePhrases])].slice(0, 10),
-            avgMessageLength: Math.round((existing.avgMessageLength + newData.avgMessageLength) / 2),
-            avgResponseTime: existing.avgResponseTime,
-            messageFrequency: existing.messageFrequency + newData.messageFrequency,
+            languagePatterns: uniqueStrings(previous.languagePatterns, incoming.languagePatterns),
+            signaturePhrases: uniqueStrings(previous.signaturePhrases, incoming.signaturePhrases, 10),
+            avgMessageLength: Math.round((numeric(previous.avgMessageLength) + numeric(incoming.avgMessageLength)) / 2),
+            avgResponseTime: numeric(previous.avgResponseTime),
+            messageFrequency: numeric(previous.messageFrequency) + numeric(incoming.messageFrequency),
             timePatterns: {
-                activeHours: [...new Set([...existing.timePatterns.activeHours, ...newData.timePatterns.activeHours])],
-                activeDays: [...new Set([...existing.timePatterns.activeDays, ...newData.timePatterns.activeDays])],
-                timezone: existing.timePatterns.timezone
+                activeHours: [...new Set([
+                    ...(Array.isArray(previousTime.activeHours) ? previousTime.activeHours : []),
+                    ...(Array.isArray(incomingTime.activeHours) ? incomingTime.activeHours : [])
+                ].filter((value) => Number.isInteger(value) && value >= 0 && value <= 23))].sort((a, b) => a - b),
+                activeDays: [...new Set([
+                    ...(Array.isArray(previousTime.activeDays) ? previousTime.activeDays : []),
+                    ...(Array.isArray(incomingTime.activeDays) ? incomingTime.activeDays : [])
+                ].filter((value) => Number.isInteger(value) && value >= 0 && value <= 6))].sort((a, b) => a - b),
+                timezone: typeof previousTime.timezone === 'string' ? previousTime.timezone : 'unknown'
             },
-            emotionSignature: newData.emotionSignature, // Use latest
-            pressureTactics: [...new Set([...existing.pressureTactics, ...newData.pressureTactics])],
-            pressureVelocity: newData.pressureVelocity
+            emotionSignature: incoming.emotionSignature || previous.emotionSignature || {},
+            pressureTactics: uniqueStrings(previous.pressureTactics, incoming.pressureTactics),
+            pressureVelocity: typeof incoming.pressureVelocity === 'string'
+                ? incoming.pressureVelocity
+                : (previous.pressureVelocity || 'medium')
         };
     }
 
