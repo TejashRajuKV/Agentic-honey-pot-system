@@ -23,11 +23,15 @@ app = Flask(__name__)
 # ─────────────────────────────────────────
 # Enable CORS (allow frontend origins)
 # ─────────────────────────────────────────
+# Keep browser access explicit. A missing FRONTEND_URL must never silently
+# enable wildcard cross-origin access in a standalone deployment.
+frontend_origin = os.getenv("FRONTEND_URL", "").strip()
 ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:3000",
-    os.getenv("FRONTEND_URL", "*"),   # set FRONTEND_URL in Render env vars
 ]
+if frontend_origin and frontend_origin != "*":
+    ALLOWED_ORIGINS.append(frontend_origin)
 CORS(app, origins=ALLOWED_ORIGINS)
 
 # ─────────────────────────────────────────
@@ -90,10 +94,11 @@ def not_found(e):
 # ─────────────────────────────────────────
 @app.errorhandler(500)
 def server_error(e):
+    # Keep exception details in server-side diagnostics, never in API responses.
+    app.logger.error("Unhandled ML API exception: %s", type(e).__name__)
     return jsonify({
-        "error":   "Internal server error",
-        "status":  500,
-        "message": str(e)
+        "error": "Internal server error",
+        "status": 500
     }), 500
 
 
