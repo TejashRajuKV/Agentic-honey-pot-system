@@ -28,6 +28,16 @@ async function registerEvent({ sessionId, triggers, intelligence = {}, riskScore
     if (!intelligence || typeof intelligence !== 'object' || Array.isArray(intelligence)) {
         throw new TypeError('intelligence must be an object');
     }
+    for (const field of ['upiIds', 'phoneNumbers', 'urls']) {
+        const values = intelligence[field];
+        if (values !== undefined && (!Array.isArray(values) || values.length > 500 ||
+            values.some((value) => typeof value !== 'string' || value.length > 4096))) {
+            throw new TypeError(`intelligence.${field} must be an array of at most 500 strings (each at most 4096 characters)`);
+        }
+    }
+    if (!Number.isFinite(riskScore) || riskScore < 0 || riskScore > 100) {
+        throw new TypeError('riskScore must be a finite number from 0 to 100');
+    }
     const upi = intelligence.upiIds?.[0];
     const phone = intelligence.phoneNumbers?.[0];
     const key = (upi && `upi:${upi.toLowerCase()}`) || (phone && `phone:${String(phone).replace(/\D/g, '').slice(-10)}`) || `session:${sessionId}`;
