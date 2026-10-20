@@ -5,7 +5,7 @@ const qualityService = require('../services/qualityService');
 
 function validSessionId(value) {
     return typeof value === 'string' && value.trim().length > 0 && value.length <= 200
-        && !/[\\/\\0-\\x1f\\x7f]/.test(value);
+        && !value.includes('/') && !value.includes('\\') && !/[\\x00-\\x1f\\x7f]/.test(value);
 }
 
 function boundedLimit(value, fallback = 100, maximum = 500) {
