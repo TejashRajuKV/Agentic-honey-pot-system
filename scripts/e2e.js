@@ -82,6 +82,14 @@ async function main() {
     });
 
     console.log("\nML detection modules (via /api/v1/ml/*)");
+    await check("ML health separates model readiness from rule-based fallbacks", async () => {
+        const r = await get("/ml/health");
+        ok(r.status === 200, `health status ${r.status}`);
+        ok(r.data.modules && r.data.fallbacks, "model and fallback readiness must be separate");
+        for (const module of ["scam_radar", "behavior_monitor", "fake_news", "phishing_detector"]) {
+            ok(r.data.fallbacks[module] === true, `fallback not reported for ${module}`);
+        }
+    });
     await check("scam radar", async () => {
         const r = await post("/ml/scam", { message: "Your KYC will be suspended. Update immediately to avoid account freeze." });
         ok(r.status === 200 && r.data.confidence >= 50, JSON.stringify(r.data).slice(0, 200));
