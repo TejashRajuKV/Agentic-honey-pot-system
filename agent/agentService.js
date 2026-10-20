@@ -1,6 +1,6 @@
 // agent/agentService.js
 
-const { buildAgentPrompt } = require('./personaPrompts');
+const { buildAgentPrompt, selectAdaptivePersona } = require('./personaPrompts');
 const { getConversationPhase, updateAgentState, AGENT_STATES } = require('./agentStateMachine');
 const { generateRuleBasedResponse, generateEmotionAwareResponse } = require('./conversationHandler');
 const { shouldUseBait, generateBaitResponse, analyzeBaitResponse } = require('./baitStrategy');
@@ -63,7 +63,8 @@ async function generateAgentResponse(userMessage, conversationHistory = [], scam
         usedBait: false,
         baitType: null,
         baitAnalysis: null,
-        governor: null  // Will be populated by Response Governor
+        governor: null,  // Will be populated by Response Governor
+        adaptivePersona: selectAdaptivePersona(categories, phase, emotion).id
     };
 
     if (useBait) {
@@ -96,7 +97,7 @@ async function generateAgentResponse(userMessage, conversationHistory = [], scam
         // Try Gemini API first if available
         if (geminiModel) {
             try {
-                const prompt = buildAgentPrompt(userMessage, conversationHistory, phase, categories);
+                const prompt = buildAgentPrompt(userMessage, conversationHistory, phase, categories, emotion);
 
                 const result = await geminiModel.generateContent(prompt);
                 const geminiResponse = result.response;
