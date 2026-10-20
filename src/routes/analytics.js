@@ -34,7 +34,7 @@ router.get('/dashboard', async (req, res) => {
         const overview = await analyticsService.getDashboardOverview();
         res.json({ status: 'success', data: overview });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(500).json({ status: 'error', message: 'Unable to retrieve analytics data' });
     }
 });
 
