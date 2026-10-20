@@ -1,7 +1,7 @@
 // src/services/alertService.js
 const crypto = require('crypto');
 const AlertConfig = require('../models/AlertConfig');
-const { validateWebhookUrl, requestValidatedWebhook } = require('../utils/webhookUrlPolicy');
+const { requestValidatedWebhook } = require('../utils/webhookUrlPolicy');
 // Uses Node's built-in fetch (node-fetch v3 is ESM-only and cannot be require()d)
 
 /**
