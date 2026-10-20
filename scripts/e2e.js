@@ -241,6 +241,18 @@ async function main() {
         ok(legacyPayload.profileId === "profile-e2e" && legacyPayload.matchCount === 3, "legacy profile/match fields missing");
         ok(legacyPayload.sharedIdentifiers[0] === "test@upi", "legacy shared identifiers missing");
     });
+    await check("alert configuration rejects malformed field types before persistence", async () => {
+        const badBody = await call("PUT", "/alerts/config", []);
+        const badEnabled = await call("PUT", "/alerts/config", { enabled: "false" });
+        const badChannels = await call("PUT", "/alerts/config", { channels: ["webhook", "exec"] });
+        const badAuth = await call("PUT", "/alerts/config", { auth: { type: "unknown" } });
+        const badRetry = await call("PUT", "/alerts/config", { retryConfig: [] });
+        ok(badBody.status === 400, `array body returned ${badBody.status}`);
+        ok(badEnabled.status === 400, `non-boolean enabled returned ${badEnabled.status}`);
+        ok(badChannels.status === 400, `unsupported channel returned ${badChannels.status}`);
+        ok(badAuth.status === 400, `unsupported auth type returned ${badAuth.status}`);
+        ok(badRetry.status === 400, `array retryConfig returned ${badRetry.status}`);
+    });
     await check("alert history pagination rejects invalid limits and caps large requests", async () => {
         const invalid = await get("/alerts/history?limit=not-a-number");
         const zero = await get("/alerts/history?limit=0");
