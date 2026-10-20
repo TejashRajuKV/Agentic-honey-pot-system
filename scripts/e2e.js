@@ -247,11 +247,23 @@ async function main() {
         const badChannels = await call("PUT", "/alerts/config", { channels: ["webhook", "exec"] });
         const badAuth = await call("PUT", "/alerts/config", { auth: { type: "unknown" } });
         const badRetry = await call("PUT", "/alerts/config", { retryConfig: [] });
+        const badHeaderName = await call("PUT", "/alerts/config", { auth: { type: "api_key", headerName: "X-API-Key\\r\\nInjected: yes" } });
         ok(badBody.status === 400, `array body returned ${badBody.status}`);
         ok(badEnabled.status === 400, `non-boolean enabled returned ${badEnabled.status}`);
         ok(badChannels.status === 400, `unsupported channel returned ${badChannels.status}`);
         ok(badAuth.status === 400, `unsupported auth type returned ${badAuth.status}`);
         ok(badRetry.status === 400, `array retryConfig returned ${badRetry.status}`);
+        ok(badHeaderName.status === 400, `invalid auth header name returned ${badHeaderName.status}`);
+    });
+    await check("webhook test endpoint rejects malformed payloads and auth values", async () => {
+        const badBody = await call("POST", "/alerts/test", []);
+        const badAuth = await post("/alerts/test", { webhookUrl: "https://example.com/hook", auth: [] });
+        const badToken = await post("/alerts/test", { webhookUrl: "https://example.com/hook", auth: { type: "bearer", token: 123 } });
+        const badHeader = await post("/alerts/test", { webhookUrl: "https://example.com/hook", auth: { type: "api_key", headerName: "X-Key\\r\\nInjected: yes" } });
+        ok(badBody.status === 400, `array body returned ${badBody.status}`);
+        ok(badAuth.status === 400, `array auth returned ${badAuth.status}`);
+        ok(badToken.status === 400, `non-string auth token returned ${badToken.status}`);
+        ok(badHeader.status === 400, `invalid header name returned ${badHeader.status}`);
     });
     await check("alert history pagination rejects invalid limits and caps large requests", async () => {
         const invalid = await get("/alerts/history?limit=not-a-number");
