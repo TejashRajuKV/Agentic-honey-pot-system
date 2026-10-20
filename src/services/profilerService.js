@@ -67,22 +67,41 @@ class ProfilerService {
             );
         }
 
-        // Add this session
-        profile.sessions.push({
+        // A profile may be rebuilt after every scammer turn. Count a session only
+        // once; otherwise one long conversation inflates victim-attempt metrics and
+        // can make a single actor appear to be a multi-session campaign.
+        if (!profile.intelligence || typeof profile.intelligence !== 'object') {
+            profile.intelligence = { totalVictimAttempts: 0, averageEngagementLength: 0 };
+        }
+        if (!Array.isArray(profile.sessions)) profile.sessions = [];
+        const existingSessionIndex = profile.sessions.findIndex((entry) => entry.sessionId === sessionId);
+        const isNewSession = existingSessionIndex < 0;
+        const previousAttempts = Number.isFinite(profile.intelligence.totalVictimAttempts)
+            ? profile.intelligence.totalVictimAttempts
+            : profile.sessions.length;
+
+        const sessionEntry = {
             sessionId,
             date: session.createdAt,
-            confidence: session.maxScamProbability / 100
-        });
+            confidence: (Number(session.maxScamProbability) || 0) / 100
+        };
+        if (isNewSession) {
+            profile.sessions.push(sessionEntry);
+            profile.intelligence.totalVictimAttempts = previousAttempts + 1;
+            profile.intelligence.averageEngagementLength =
+                ((Number(profile.intelligence.averageEngagementLength) || 0) * previousAttempts + turns.length) /
+                Math.max(profile.intelligence.totalVictimAttempts, 1);
+        } else {
+            // Refresh current session evidence without treating another turn as a new attempt.
+            profile.sessions[existingSessionIndex] = sessionEntry;
+        }
 
-        // Update intelligence
-        profile.intelligence.totalVictimAttempts = profile.sessions.length;
-        profile.intelligence.averageEngagementLength =
-            (profile.intelligence.averageEngagementLength * (profile.sessions.length - 1) + turns.length) /
-            profile.sessions.length;
+        // Bound stored session references while keeping the cumulative attempt counter.
+        if (profile.sessions.length > 500) profile.sessions = profile.sessions.slice(-500);
 
-        // Calculate risk score
+        // Calculate risk score from cumulative distinct-session metrics.
         profile.riskScore = this._calculateRiskScore(profile);
-        profile.confidence = Math.min(profile.sessions.length / 5, 1);
+        profile.confidence = Math.min(profile.intelligence.totalVictimAttempts / 5, 1);
 
         profile.lastSeen = new Date();
 
@@ -477,7 +496,7 @@ class ProfilerService {
         let score = 0;
 
         // Session count contribution (more sessions = higher risk)
-        score += Math.min(profile.sessions.length * 5, 30);
+        score += Math.min((profile.intelligence?.totalVictimAttempts || profile.sessions.length) * 5, 30);
 
         // Psychological factors
         const tacticRisk = {
@@ -498,9 +517,9 @@ class ProfilerService {
         score += Math.min(profile.behavioralFingerprint.pressureTactics.length * 5, 20);
 
         // Intelligence metrics
-        if (profile.intelligence.totalVictimAttempts > 10) {
+        if ((profile.intelligence.totalVictimAttempts || profile.sessions.length) > 10) {
             score += 15;
-        } else if (profile.intelligence.totalVictimAttempts > 5) {
+        } else if ((profile.intelligence.totalVictimAttempts || profile.sessions.length) > 5) {
             score += 10;
         }
 
