@@ -320,9 +320,17 @@ router.get("/incidents", async (req, res) => {
     }
 });
 router.post("/incidents/:id/resolve", async (req, res) => {
-    const doc = await incidents.setStatus(req.params.id, "resolved");
-    if (!doc) return res.status(404).json({ status: "error", message: "Incident not found" });
-    res.json({ status: "success", data: { incidentId: doc.incidentId, status: doc.status } });
+    const incidentId = req.params.id;
+    if (typeof incidentId !== "string" || !incidentId.trim() || incidentId.length > 200) {
+        return res.status(400).json({ status: "error", message: "A valid incident ID is required" });
+    }
+    try {
+        const doc = await incidents.setStatus(incidentId, "resolved");
+        if (!doc) return res.status(404).json({ status: "error", message: "Incident not found" });
+        return res.json({ status: "success", data: { incidentId: doc.incidentId, status: doc.status } });
+    } catch (error) {
+        return res.status(500).json({ status: "error", message: "Unable to resolve incident" });
+    }
 });
 
 /** GET /api/v1/console/sessions?limit=&scam=true — recent honeypot sessions */
