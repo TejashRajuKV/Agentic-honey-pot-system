@@ -54,6 +54,7 @@ export default function InvestigationCenter() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { const timer = setInterval(() => { load(); }, 30000); return () => clearInterval(timer); }, [load]);
 
   const run = async (work, success) => {
     setError(""); setMessage("");
