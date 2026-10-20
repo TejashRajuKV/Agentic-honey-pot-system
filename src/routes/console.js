@@ -177,7 +177,7 @@ router.get("/intelligence/summary", async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        res.status(500).json({ status: "error", message: "Unable to load intelligence summary" });
     }
 });
 
@@ -251,7 +251,7 @@ router.post("/risk", async (req, res) => {
         });
         res.json({ status: "success", data: result });
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        res.status(500).json({ status: "error", message: "Unable to assess risk" });
     }
 });
 
@@ -262,7 +262,7 @@ router.get("/sessions/:id/killchain", async (req, res) => {
         if (!analysis) return res.status(404).json({ status: "error", message: "No scammer messages in this session" });
         res.json({ status: "success", data: analysis });
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        res.status(500).json({ status: "error", message: "Unable to analyze session kill chain" });
     }
 });
 
@@ -278,7 +278,7 @@ router.get("/campaigns", async (req, res) => {
         const data = await campaigns.detectCampaigns({ minSessions });
         res.json({ status: "success", count: data.length, data });
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        res.status(500).json({ status: "error", message: "Unable to detect campaigns" });
     }
 });
 
@@ -297,7 +297,7 @@ router.get("/stix", async (req, res) => {
         if (download === "true") res.setHeader("Content-Disposition", "attachment; filename=cyberrakshak_stix_bundle.json");
         res.send(JSON.stringify(bundle, null, 2));
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        res.status(500).json({ status: "error", message: "Unable to build STIX bundle" });
     }
 });
 
