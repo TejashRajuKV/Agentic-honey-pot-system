@@ -59,17 +59,26 @@ class ProfilerService {
                 }
             });
         } else {
-            // Update existing profile
-            profile.behavioralFingerprint = this._mergeBehavioral(
-                profile.behavioralFingerprint,
-                behavioral
-            );
-            profile.psychologicalProfile = this._mergePsychological(
-                profile.psychologicalProfile,
-                psychological
-            );
-            // Preserve identifiers discovered in later sessions instead of keeping
-            // only the first session's indicator set.
+            // buildProfile can run repeatedly as each turn arrives. The session's
+            // messages are a complete snapshot, not a delta: merging the snapshot
+            // every time inflated messageFrequency and repeatedly reweighted the
+            // psychological profile. Aggregate behavioral metrics only when this
+            // session is first associated with the profile.
+            const alreadyTrackedSession = Array.isArray(profile.sessions) &&
+                profile.sessions.some((entry) => entry && entry.sessionId === sessionId);
+            if (!alreadyTrackedSession) {
+                profile.behavioralFingerprint = this._mergeBehavioral(
+                    profile.behavioralFingerprint,
+                    behavioral
+                );
+                profile.psychologicalProfile = this._mergePsychological(
+                    profile.psychologicalProfile,
+                    psychological
+                );
+            }
+
+            // Identifiers can legitimately appear in later turns of an already
+            // tracked session, so always merge these independently of session count.
             if (!profile.identifiers || typeof profile.identifiers !== 'object') profile.identifiers = {};
             for (const [field, values] of Object.entries(identifiers)) {
                 const previous = Array.isArray(profile.identifiers[field]) ? profile.identifiers[field] : [];
