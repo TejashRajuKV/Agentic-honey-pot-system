@@ -19,7 +19,14 @@ class ProfilerService {
             return null;
         }
 
-        const turns = await ConversationTurn.find({ sessionId }).sort({ timestamp: 1 });
+        // Profiles are rebuilt from persisted history; cap the working set so a
+        // long-running or adversarial session cannot make profiling unbounded.
+        // Fetch the newest turns efficiently, then restore chronological order for
+        // temporal and emotion-sequence calculations.
+        const turns = (await ConversationTurn.find({ sessionId })
+            .sort({ turnIndex: -1, _id: -1 })
+            .limit(2000)
+            .lean()).reverse();
         const scammerMessages = turns.filter(t => t.role === 'user');
 
         if (scammerMessages.length === 0) {
@@ -37,9 +44,15 @@ class ProfilerService {
 
         // Check if profile already exists
         const identityClauses = [];
+        const allowedIdentifierFields = new Set(['upiIds', 'phoneNumbers', 'emails', 'urls']);
         for (const [field, values] of Object.entries(identifiers)) {
-            if (Array.isArray(values) && values.length > 0) {
-                identityClauses.push({ [`identifiers.${field}`]: { $in: values } });
+            if (allowedIdentifierFields.has(field) && Array.isArray(values) && values.length > 0) {
+                // Bound the database predicate even if an extractor returns malformed
+                // or unexpectedly large output.
+                const candidates = [...new Set(values
+                    .filter((value) => typeof value === 'string' && value.trim() && value.length <= 256)
+                    .map((value) => value.trim()))].slice(0, 100);
+                if (candidates.length) identityClauses.push({ [`identifiers.${field}`]: { $in: candidates } });
             }
         }
         let profile = identityClauses.length
