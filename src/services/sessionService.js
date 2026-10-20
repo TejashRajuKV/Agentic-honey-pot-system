@@ -53,10 +53,15 @@ async function updateSession(sessionId, updates) {
  * @returns {Array} - Array of conversation turns
  */
 async function getConversationHistory(sessionId) {
+    // Query only the recent context window at the database layer. Fetching every
+    // historical turn and slicing in the controller still makes old sessions
+    // progressively more expensive to process.
     const turns = await ConversationTurn.find({ sessionId })
-        .sort({ turnIndex: 1 });
+        .sort({ turnIndex: -1, _id: -1 })
+        .limit(30)
+        .lean();
 
-    return turns;
+    return turns.reverse();
 }
 
 /**
