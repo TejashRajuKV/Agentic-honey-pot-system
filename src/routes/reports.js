@@ -11,7 +11,7 @@ const fail = (res, error) => {
 
 function validSessionId(value) {
     return typeof value === 'string' && value.trim().length > 0 && value.length <= 200
-        && !value.includes('/') && !value.includes('\\') && !/[\\x00-\\x1f\\x7f]/.test(value);
+        && !value.includes('/') && !value.includes('\\') && ![...value].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127);
 }
 
 function boundedLimit(value, fallback = 100, maximum = 500) {
