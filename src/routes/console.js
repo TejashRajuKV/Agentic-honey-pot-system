@@ -316,7 +316,7 @@ router.get("/incidents", async (req, res) => {
         const data = await incidents.listIncidents({ limit: Math.min(parsedLimit, 100), status });
         res.json({ status: "success", count: data.length, data });
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        res.status(500).json({ status: "error", message: "Unable to list incidents" });
     }
 });
 router.post("/incidents/:id/resolve", async (req, res) => {
@@ -358,7 +358,7 @@ router.get("/sessions", async (req, res) => {
             })),
         });
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        res.status(500).json({ status: "error", message: "Unable to load sessions" });
     }
 });
 
@@ -419,7 +419,7 @@ router.get("/sessions/:id", async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        res.status(500).json({ status: "error", message: "Unable to load session details" });
     }
 });
 
@@ -443,7 +443,7 @@ router.get("/sessions/:id/audit", async (req, res) => {
             })),
         });
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        res.status(500).json({ status: "error", message: "Unable to load session audit" });
     }
 });
 
@@ -476,7 +476,7 @@ router.get("/known-identifiers", async (req, res) => {
             })),
         });
     } catch (error) {
-        res.status(500).json({ status: "error", message: error.message });
+        res.status(500).json({ status: "error", message: "Unable to load audit statistics" });
     }
 });
 
