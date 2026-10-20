@@ -21,7 +21,8 @@
     "smoke:deploy": "node scripts/smoke-deploy.js",
     "test:smoke-deploy": "node scripts/smoke-deploy.test.js",
     "test:investigation-analysis": "node tests/investigation-analysis.js",
-    "test:rule-lab": "node tests/rule-lab.js"
+    "test:rule-lab": "node tests/rule-lab.js",
+    "test:simulation-service": "node tests/simulation-service.js"
   },
   "keywords": [
     "honeypot",
