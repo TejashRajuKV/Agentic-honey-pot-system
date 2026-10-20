@@ -383,9 +383,16 @@ class AlertService {
      */
     async checkTriggers(sessionData) {
         const alerts = [];
-        const config = await AlertConfig.findOne();
+        let config = await AlertConfig.findOne();
 
-        if (!config || !config.enabled) {
+        // Create the default configuration on first use. Returning an empty trigger
+        // list when the database has no config silently disabled alerting for the
+        // first scam session and prevented its incident from being correlated later.
+        if (!config) {
+            config = await AlertConfig.create({ enabled: true, channels: ["log"] });
+        }
+
+        if (!config.enabled) {
             return alerts;
         }
 
