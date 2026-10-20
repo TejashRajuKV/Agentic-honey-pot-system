@@ -111,6 +111,7 @@ app.use("/api/v1/profiles", consoleAuth, profilerRoutes);
 app.use("/api/v1/alerts", alertsRateLimit, consoleAuth, alertsRoutes);
 app.use("/api/v1/quality", consoleAuth, qualityRoutes);
 app.use("/api/v1/reports", consoleAuth, reportsRoutes);
+app.use("/api/v1/investigations", consoleAuth, require("./routes/investigations").router);
 app.use("/api/v1/language", consoleAuth, languageRoutes);
 
 // ── System status + first-party web-console API ───────────────────────────
