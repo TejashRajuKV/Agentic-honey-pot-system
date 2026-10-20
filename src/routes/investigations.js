@@ -11,6 +11,7 @@ const DetectionRule = require("../models/DetectionRule");
 const PlaybookRun = require("../models/PlaybookRun");
 const ruleLab = require("../services/ruleLabService");
 const simulationService = require("../services/simulationService");
+const privacyService = require("../services/privacyService");
 
 const SEVERITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 const CASE_STATUSES = ["open", "investigating", "contained", "resolved", "false_positive"];
@@ -471,6 +472,53 @@ router.post("/playbooks/execute", async (req, res) => {
         if (error?.code === 11000) return res.status(409).json({ status: "error", message: "requestId has already been used" });
         res.status(500).json({ status: "error", message: "Approved playbook could not be completed" });
     }
+});
+
+router.post("/privacy/redact", (req, res) => {
+    try {
+        const result = privacyService.redactText(req.body?.text);
+        res.json({ status: "success", data: result });
+    } catch (error) {
+        res.status(400).json({ status: "error", message: error instanceof TypeError ? error.message : "Unable to redact text" });
+    }
+});
+
+router.get("/privacy/retention", (_req, res) => {
+    const days = privacyService.configuredRetentionDays();
+    res.json({ status: "success", data: {
+        configuredDays: days,
+        minimumDays: privacyService.MIN_RETENTION_DAYS,
+        maximumDays: privacyService.MAX_RETENTION_DAYS,
+        policySource: process.env.DATA_RETENTION_DAYS ? "environment" : "default",
+        enforcement: "preview_only",
+        note: "This setting documents the retention target and powers previews; it does not automatically delete records."
+    } });
+});
+
+router.get("/privacy/retention/preview", async (req, res) => {
+    const days = req.query.days === undefined ? privacyService.configuredRetentionDays() : Number(req.query.days);
+    if (!Number.isInteger(days) || days < privacyService.MIN_RETENTION_DAYS || days > privacyService.MAX_RETENTION_DAYS) {
+        return res.status(400).json({ status: "error", message: `days must be an integer between ${privacyService.MIN_RETENTION_DAYS} and ${privacyService.MAX_RETENTION_DAYS}` });
+    }
+    try {
+        const cutoff = new Date(Date.now() - days * 86400000);
+        const Session = require("../models/Session");
+        const [sessions, turns, auditEvents, feedback, cases, indicators] = await Promise.all([
+            Session.countDocuments({ createdAt: { $lt: cutoff } }),
+            ConversationTurn.countDocuments({ timestamp: { $lt: cutoff } }),
+            AuditLog.countDocuments({ timestamp: { $lt: cutoff } }),
+            AnalystFeedback.countDocuments({ reviewedAt: { $lt: cutoff } }),
+            InvestigationCase.countDocuments({ updatedAt: { $lt: cutoff }, status: { $in: ["resolved", "false_positive"] } }),
+            IndicatorReputation.countDocuments({ lastSeenAt: { $lt: cutoff } })
+        ]);
+        res.json({ status: "success", data: {
+            retentionDays: days, cutoff: cutoff.toISOString(),
+            candidateCounts: { sessions, conversationTurns: turns, auditEvents, analystFeedback: feedback, closedCases: cases, staleIndicators: indicators },
+            totalCandidateRecords: sessions + turns + auditEvents + feedback + cases + indicators,
+            destructiveActionPerformed: false,
+            note: "Counts are an estimate for review only. No records were changed or deleted; review linked case evidence and legal obligations before applying a retention policy."
+        } });
+    } catch { res.status(500).json({ status: "error", message: "Unable to calculate retention preview" }); }
 });
 
 router.get("/simulation/scenarios", (_req, res) => {
