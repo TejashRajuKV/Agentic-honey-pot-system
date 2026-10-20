@@ -74,21 +74,43 @@ async function getConversationHistory(sessionId) {
  * @returns {Object} - Saved conversation turn
  */
 async function saveConversationTurn(sessionId, role, text, intel = {}, scamIntent = false) {
-    // Get current turn count
-    const existingTurns = await ConversationTurn.countDocuments({ sessionId });
+    // Initialize legacy sessions from their existing turn count exactly once. The
+    // conditional update makes concurrent first writers converge on one sequence.
+    const session = await Session.findOne({ sessionId }).select("turnSequence").lean();
+    if (!session) {
+        throw new Error("Session not found");
+    }
+    if (!Number.isSafeInteger(session.turnSequence) || session.turnSequence < 0) {
+        const existingTurns = await ConversationTurn.countDocuments({ sessionId });
+        await Session.updateOne(
+            { sessionId, turnSequence: { $exists: false } },
+            { $set: { turnSequence: existingTurns } }
+        );
+    }
+
+    // Allocate indexes atomically instead of countDocuments() followed by insert,
+    // which gave simultaneous requests the same turnIndex.
+    const allocated = await Session.findOneAndUpdate(
+        { sessionId },
+        { $inc: { turnSequence: 1 } },
+        { new: true, projection: { turnSequence: 1 } }
+    ).lean();
+    if (!allocated || !Number.isSafeInteger(allocated.turnSequence) || allocated.turnSequence < 1) {
+        throw new Error("Unable to allocate conversation turn index");
+    }
 
     const turn = new ConversationTurn({
         sessionId,
-        turnIndex: existingTurns,
+        turnIndex: allocated.turnSequence - 1,
         role,
         text,
         detectedScamIntent: scamIntent,
         extractedIntel: {
-            upiIds: intel.upiIds || [],
-            phoneNumbers: intel.phoneNumbers || [],
-            urls: intel.urls || [],
-            scamPhrases: intel.scamPhrases || [],
-            behavioralPatterns: intel.behavioralPatterns || []
+            upiIds: Array.isArray(intel.upiIds) ? intel.upiIds : [],
+            phoneNumbers: Array.isArray(intel.phoneNumbers) ? intel.phoneNumbers : [],
+            urls: Array.isArray(intel.urls) ? intel.urls : [],
+            scamPhrases: Array.isArray(intel.scamPhrases) ? intel.scamPhrases : [],
+            behavioralPatterns: Array.isArray(intel.behavioralPatterns) ? intel.behavioralPatterns : []
         }
     });
 
