@@ -79,6 +79,7 @@ jobs:
           npm run test:behavioral-similarity
           npm run test:adaptive-persona
           npm run test:indicator-reputation
+          npm run test:alert-triage
           npm run test:readiness -- 1
 
       - name: Run end-to-end API integration tests
