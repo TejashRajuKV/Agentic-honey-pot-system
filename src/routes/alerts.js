@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const alertService = require('../services/alertService');
+const { prioritizeAlerts } = require('../services/alertTriageService');
 const AlertConfig = require('../models/AlertConfig');
 const { validateWebhookUrl } = require('../utils/webhookUrlPolicy');
 
@@ -201,6 +202,40 @@ router.get('/history', async (req, res) => {
         res.json({ status: 'success', data: history, count: history.length });
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'Unable to load alert history' });
+    }
+});
+
+/**
+ * @route GET /api/v1/alerts/triage
+ * @desc Get recent alerts ranked by explainable investigation priority
+ */
+router.get('/triage', async (req, res) => {
+    try {
+        const limit = boundedAlertLimit(req.query.limit);
+        if (limit === null) return res.status(400).json({ status: 'error', message: 'limit must be a positive integer' });
+        const history = await alertService.getAlertHistory(500);
+        const ranked = prioritizeAlerts(history.map((item, index) => {
+            const alert = item && typeof item.toObject === 'function' ? item.toObject() : { ...item };
+            const payload = alert.payload && typeof alert.payload === 'object' ? alert.payload : {};
+            const nested = payload.alert && typeof payload.alert === 'object' ? payload.alert : {};
+            return {
+                ...alert,
+                id: String(alert._id || alert.id || alert.sessionId || index),
+                type: alert.type || payload.event || payload.type || 'unknown',
+                severity: alert.severity || nested.severity || payload.severity,
+                riskScore: alert.riskScore ?? nested.riskScore ?? payload.riskScore,
+                repeatCount: alert.repeatCount ?? nested.matchCount ?? payload.matchCount,
+                timestamp: alert.timestamp || payload.timestamp
+            };
+        })).slice(0, limit);
+        res.json({
+            status: 'success',
+            data: ranked,
+            count: ranked.length,
+            disclaimer: 'Priority is an explainable review aid, not proof of malicious activity or identity.'
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: 'Unable to rank alert history' });
     }
 });
 

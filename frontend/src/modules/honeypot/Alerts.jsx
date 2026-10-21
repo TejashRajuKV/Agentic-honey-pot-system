@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getAlertConfig, saveAlertConfig, testWebhook, getAlertHistory, getAlertStats, getIncidents, resolveIncident } from "../../api/honeypotApi";
+import { getAlertConfig, saveAlertConfig, testWebhook, getAlertHistory, getAlertTriage, getAlertStats, getIncidents, resolveIncident } from "../../api/honeypotApi";
 import { useLoad, SectionLabel, Panel, Kv, Chips, Status, errMsg, fmtDate, riskColor } from "./shared";
 
 const TRIGGER_LABELS = {
@@ -15,6 +15,7 @@ const CHANNELS = ["log", "database", "webhook"];
 export default function Alerts() {
     const config = useLoad(getAlertConfig, []);
     const history = useLoad(getAlertHistory, [], 10000);
+    const triage = useLoad(getAlertTriage, [], 10000);
     const stats = useLoad(getAlertStats, [], 10000);
     const incidents = useLoad(getIncidents, [], 10000);
     const [form, setForm] = useState(null);
@@ -158,6 +159,28 @@ export default function Alerts() {
                                 </div>
                             ))}
                         </div>
+                    </Panel>
+                    <Panel title={`PRIORITIZED_REVIEW_QUEUE (${triage.data?.count ?? triage.data?.length ?? 0})`}>
+                        <Status loading={triage.loading && !triage.data} error={triage.error} empty={(triage.data?.data || triage.data || []).length === 0} emptyText="No alerts to prioritize yet." />
+                        <div className="hp-scroll">
+                            {(triage.data?.data || triage.data || []).map((a, i) => {
+                                const item = a.triage || {};
+                                const color = item.priority === "P1" ? "var(--red)" : item.priority === "P2" ? "var(--orange, #f0a34a)" : item.priority === "P3" ? "var(--yellow, #d9bd55)" : "var(--green)";
+                                return (
+                                    <div key={a.id || a._id || i} className="hp-row">
+                                        <div className="hp-row-main">
+                                            <div className="mono" style={{ color, fontWeight: 700 }}>{item.priority || "P4"} · {item.score ?? 0}/100 · {a.type || "alert"}</div>
+                                            <div className="mono hp-muted">{a.sessionId || a.payload?.alert?.sessionId || "—"} · {fmtDate(a.timestamp || a.payload?.timestamp)}</div>
+                                            <div className="mono hp-muted" style={{ whiteSpace: "normal" }}>
+                                                {(item.factors || []).filter((f) => f.points > 0).map((f) => `${f.name.replace(/_/g, " ")} +${f.points}`).join(" · ") || "No additional risk factors recorded"}
+                                            </div>
+                                        </div>
+                                        <div className="mono hp-risk" style={{ color }}>{item.recommendedAction || "monitor"}</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="mono hp-muted" style={{ fontSize: 11, marginTop: 8 }}>Priority supports analyst review; it is not proof of malicious activity or identity.</div>
                     </Panel>
                     <Panel title="ALERT_HISTORY">
                         <Status loading={history.loading && !history.data} error={history.error} empty={history.data && !history.data.length} emptyText="No alerts fired yet — they trigger when a session crosses a threshold." />
