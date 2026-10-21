@@ -1,14 +1,18 @@
 "use strict";
-const assert = require("node:assert/strict");
+const { T } = require("./harness");
 const { prioritizeAlert, prioritizeAlerts, normalizeSeverity } = require("../../src/services/alertTriageService");
-
-module.exports = async function alertTriageReadiness() {
-  const recent = { severity: "HIGH", riskScore: 80, novelty: "rare", repeatCount: 3, evidenceCount: 2, timestamp: new Date().toISOString() };
-  const result = prioritizeAlert(recent);
-  assert.equal(result.priority, prioritizeAlert(recent).priority);
-  assert.ok(result.score > 0 && result.score <= 100);
-  assert.ok(result.factors.length > 0);
-  assert.equal(normalizeSeverity("unknown"), "INFO");
-  assert.equal(prioritizeAlerts([recent])[0].triage.priority, result.priority);
-  return { name: "explainable-alert-triage", status: "passed", priority: result.priority };
+exports.title = "Explainable alert triage";
+exports.run = async function (t) {
+  t.test("scores severity and risk", () => {
+    const result = prioritizeAlert({ severity: "CRITICAL", riskScore: 95, timestamp: new Date().toISOString() });
+    t.assert(result.score > 0 && result.score <= 100);
+    t.assertEqual(result.severity, "CRITICAL");
+    t.assert(result.factors.some((factor) => factor.name === "risk_score"));
+  });
+  t.test("unknown severity defaults safely", () => t.assertEqual(normalizeSeverity("mystery"), "INFO"));
+  t.test("sorts by score descending", () => {
+    const rows = prioritizeAlerts([{ id: "low", severity: "LOW" }, { id: "high", severity: "HIGH", riskScore: 85 }]);
+    t.assertEqual(rows[0].id, "high");
+  });
+  t.test("labels result as triage, not proof", () => t.assert(/not proof/i.test(prioritizeAlert({}).disclaimer));
 };
