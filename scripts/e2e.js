@@ -353,6 +353,16 @@ async function main() {
         const r = await get("/alerts/history");
         ok(r.data.data.some((a) => a.sessionId === hard && a.type === "critical_risk"), "no critical_risk alert for session");
     });
+    await check("triage feed returns ranked alerts with explainable factors", async () => {
+        const r = await get("/alerts/triage?limit=20");
+        ok(r.status === 200, `triage status ${r.status}`);
+        ok(Array.isArray(r.data.data), "triage data must be an array");
+        ok(r.data.data.every((a) => a.triage && Number.isFinite(a.triage.score) && a.triage.score >= 0 && a.triage.score <= 100), "every alert needs a bounded triage score");
+        ok(r.data.data.every((a) => Array.isArray(a.triage.factors) && a.triage.priority), "triage explanations or priority missing");
+        ok(/not proof/i.test(r.data.disclaimer || ""), "triage disclaimer missing");
+        const invalid = await get("/alerts/triage?limit=0");
+        ok(invalid.status === 400, `invalid triage limit returned ${invalid.status}`);
+    });
     await check("alert config round-trips", async () => {
         const cfg = (await get("/alerts/config")).data.data;
         const saved = await call("PUT", "/alerts/config", { enabled: cfg.enabled, triggers: cfg.triggers, channels: cfg.channels, filters: cfg.filters });

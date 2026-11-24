@@ -68,6 +68,7 @@ export const getAlertConfig = () => client.get("/alerts/config").then(data);
 export const saveAlertConfig = (config) => client.put("/alerts/config", config).then(data);
 export const testWebhook = (webhookUrl, auth) => client.post("/alerts/test", { webhookUrl, auth }).then(data);
 export const getAlertHistory = () => client.get("/alerts/history").then(data);
+export const getAlertTriage = (limit = 30) => client.get("/alerts/triage", { params: { limit } }).then(data);
 export const getAlertStats = () => client.get("/alerts/stats").then(data);
 
 // ── Quality ──────────────────────────────────────────────
